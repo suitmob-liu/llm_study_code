@@ -165,6 +165,93 @@ sudo systemctl status onlinenote
 sudo journalctl -u onlinenote -f
 ```
 
+### 7. Docker 部署
+
+#### 构建镜像
+
+```bash
+cd onlineNote
+docker build -t onlinenote .
+```
+
+镜像采用多阶段构建，编译阶段下载依赖并编译，运行阶段仅包含可执行文件和静态资源，最终镜像约 70MB。
+
+#### 添加用户
+
+容器启动前需要先创建用户。通过临时容器执行 `manage_users`，操作会写入宿主机挂载的 `data` 目录：
+
+```bash
+# 在宿主机创建数据目录
+mkdir -p /opt/onlinenote/data
+
+# 添加用户
+docker run --rm -v /opt/onlinenote/data:/app/data onlinenote ./manage_users add admin yourpassword
+
+# 查看用户列表
+docker run --rm -v /opt/onlinenote/data:/app/data onlinenote ./manage_users list
+```
+
+#### 启动容器
+
+```bash
+docker run -d \
+  --name onlinenote \
+  --restart always \
+  -p 8080:8080 \
+  -v /opt/onlinenote/data:/app/data \
+  onlinenote
+```
+
+参数说明：
+
+| 参数 | 说明 |
+|------|------|
+| `-p 8080:8080` | 端口映射，左侧为宿主机端口，可按需修改 |
+| `-v /opt/onlinenote/data:/app/data` | 数据持久化，数据库文件存放在宿主机 |
+| `--restart always` | 容器异常退出或服务器重启后自动恢复 |
+
+#### 常用管理命令
+
+```bash
+# 查看日志
+docker logs -f onlinenote
+
+# 停止 / 启动 / 重启
+docker stop onlinenote
+docker start onlinenote
+docker restart onlinenote
+
+# 进入容器执行用户管理
+docker exec onlinenote ./manage_users list
+docker exec onlinenote ./manage_users add user2 pass123
+docker exec onlinenote ./manage_users passwd admin newpass
+
+# 删除容器（数据在宿主机 data 目录中不受影响）
+docker rm -f onlinenote
+```
+
+#### Docker Compose
+
+也可以使用 `docker-compose.yml`：
+
+```yaml
+services:
+  onlinenote:
+    build: .
+    container_name: onlinenote
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+```
+
+```bash
+docker compose up -d          # 启动
+docker compose logs -f        # 查看日志
+docker compose down           # 停止并移除容器
+```
+
 ## 使用说明
 
 ### 登录
