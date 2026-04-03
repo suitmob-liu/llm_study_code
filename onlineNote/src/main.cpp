@@ -401,7 +401,7 @@ int main(int argc,char*argv[]){
         auto s=auth(r,res);if(!s)return;
         if(!r.has_file("file")){res.status=400;res.set_content(R"({"error":"no file"})","application/json");return;}
         auto f=r.get_file_value("file");int nid=0;
-        if(r.has_param("note_id"))try{nid=std::stoi(r.get_param_value("note_id"));}catch(...){}
+        if(r.has_file("note_id"))try{nid=std::stoi(r.get_file_value("note_id").content);}catch(...){}
         int id=db.save_attachment(s->user_id,nid,f.filename,f.content_type,f.content);
         if(id==-2){res.status=413;res.set_content(R"({"error":"too large"})","application/json");}
         else if(id==-1){res.status=507;res.set_content(R"({"error":"storage"})","application/json");}
