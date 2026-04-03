@@ -10,7 +10,7 @@ deps/.ready:
 	@touch $@
 
 deps/sqlite3.o: deps/.ready
-	$(CC) -O2 -DSQLITE_THREADSAFE=1 -c deps/sqlite3.c -o $@
+	$(CC) -O2 -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_FTS5 -c deps/sqlite3.c -o $@
 
 server: src/main.cpp src/sha256.h deps/.ready deps/sqlite3.o
 	$(CXX) $(CXXFLAGS) -Ideps -Isrc -o $@ src/main.cpp deps/sqlite3.o $(LDFLAGS)

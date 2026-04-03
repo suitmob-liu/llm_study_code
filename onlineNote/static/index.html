@@ -3,21 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Online Notes</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.svg">
 </head>
 <body>
     <!-- Login -->
     <div id="login-screen" class="screen">
         <div class="login-bg"><div class="shape s1"></div><div class="shape s2"></div><div class="shape s3"></div></div>
         <div class="login-card">
-            <select id="login-lang" class="lang-sel login-lang-sel"><option value="zh-CN">简体中文</option><option value="en">English</option><option value="zh-TW">繁體中文</option></select>
-            <div class="login-logo"><svg width="44" height="44" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="url(#lg)"/><path d="M14 14h14a4 4 0 014 4v16a2 2 0 01-2 2H16a2 2 0 01-2-2V14z" fill="rgba(255,255,255,.25)"/><path d="M18 22h12M18 27h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/><defs><linearGradient id="lg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs></svg></div>
+            <div class="login-top-bar">
+                <select id="login-lang" class="lang-sel login-lang-sel">
+                    <option value="zh-CN">简体中文</option>
+                    <option value="en">English</option>
+                    <option value="zh-TW">繁體中文</option>
+                </select>
+                <button id="login-theme-toggle" class="theme-toggle" type="button" data-i18n-title="theme.toggle" title="Toggle dark mode">
+                    <svg class="sun-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+                    <svg class="moon-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                </button>
+            </div>
+            <div class="login-logo">
+                <svg width="44" height="44" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="url(#lg)"/><path d="M14 14h14a4 4 0 014 4v16a2 2 0 01-2 2H16a2 2 0 01-2-2V14z" fill="rgba(255,255,255,.25)"/><path d="M18 22h12M18 27h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/><defs><linearGradient id="lg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs></svg>
+            </div>
             <h1 data-i18n="app.title">Online Notes</h1>
             <p class="login-sub" data-i18n="app.subtitle">Your personal workspace</p>
             <form id="login-form">
-                <div class="igroup"><svg class="iico" viewBox="0 0 20 20" fill="currentColor"><path d="M10 10a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 1114 0H3z"/></svg><input type="text" id="username" data-i18n-ph="login.username" placeholder="Username" required autocomplete="username"></div>
-                <div class="igroup"><svg class="iico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg><input type="password" id="password" data-i18n-ph="login.password" placeholder="Password" required autocomplete="current-password"></div>
+                <div class="igroup">
+                    <svg class="iico" viewBox="0 0 20 20" fill="currentColor"><path d="M10 10a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 1114 0H3z"/></svg>
+                    <input type="text" id="username" data-i18n-ph="login.username" placeholder="Username" required autocomplete="username">
+                </div>
+                <div class="igroup">
+                    <svg class="iico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                    <input type="password" id="password" data-i18n-ph="login.password" placeholder="Password" required autocomplete="current-password">
+                </div>
                 <button type="submit" id="login-btn" data-i18n="login.submit">Sign In</button>
                 <p id="login-error" class="error"></p>
             </form>
@@ -27,20 +50,46 @@
     <!-- App -->
     <div id="app-screen" class="screen" style="display:none">
         <header>
-            <button id="menu-btn" class="mobile-only ico-btn" title="Menu"><svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5h14a1 1 0 010 2H3a1 1 0 010-2zm0 4h14a1 1 0 010 2H3a1 1 0 010-2zm0 4h14a1 1 0 010 2H3a1 1 0 010-2z"/></svg></button>
-            <div class="hdr-brand"><svg width="22" height="22" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="url(#hg)"/><path d="M14 14h14a4 4 0 014 4v16a2 2 0 01-2 2H16a2 2 0 01-2-2V14z" fill="rgba(255,255,255,.25)"/><path d="M18 22h12M18 27h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/><defs><linearGradient id="hg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs></svg><h2 data-i18n="app.brand">Notes</h2></div>
+            <button id="menu-btn" class="mobile-only ico-btn" title="Menu">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5h14a1 1 0 010 2H3a1 1 0 010-2zm0 4h14a1 1 0 010 2H3a1 1 0 010-2zm0 4h14a1 1 0 010 2H3a1 1 0 010-2z"/></svg>
+            </button>
+            <div class="hdr-brand">
+                <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="url(#hg)"/><path d="M14 14h14a4 4 0 014 4v16a2 2 0 01-2 2H16a2 2 0 01-2-2V14z" fill="rgba(255,255,255,.25)"/><path d="M18 22h12M18 27h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/><defs><linearGradient id="hg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs></svg>
+                <h2 data-i18n="app.brand">Notes</h2>
+            </div>
             <div class="hdr-right">
-                <div id="storage-widget" class="hdr-widget"><span id="storage-info">--</span><div class="st-bar"><div id="st-bar-fill" class="st-bar-fill"></div></div></div>
-                <select id="app-lang" class="lang-sel"><option value="zh-CN">简体</option><option value="en">EN</option><option value="zh-TW">繁體</option></select>
-                <div class="user-badge"><div class="user-av" id="user-av">U</div><span id="user-info" class="desk-only"></span></div>
-                <button id="logout-btn" class="ico-btn" data-i18n-title="header.logout" title="Logout"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h5a1 1 0 100-2H4V5h4a1 1 0 100-2H3zm11.293 3.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L15.586 11H8a1 1 0 110-2h7.586l-1.293-1.293a1 1 0 010-1.414z"/></svg></button>
+                <div id="storage-widget" class="hdr-widget">
+                    <span id="storage-info">--</span>
+                    <div class="st-bar"><div id="st-bar-fill" class="st-bar-fill"></div></div>
+                </div>
+                <select id="app-lang" class="lang-sel">
+                    <option value="zh-CN">简体</option>
+                    <option value="en">EN</option>
+                    <option value="zh-TW">繁體</option>
+                </select>
+                <button id="theme-toggle" class="theme-toggle" type="button" data-i18n-title="theme.toggle" title="Toggle dark mode">
+                    <svg class="sun-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+                    <svg class="moon-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                </button>
+                <div class="user-badge">
+                    <div class="user-av" id="user-av">U</div>
+                    <span id="user-info" class="desk-only"></span>
+                </div>
+                <button id="logout-btn" class="ico-btn" data-i18n-title="header.logout" title="Logout">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h5a1 1 0 100-2H4V5h4a1 1 0 100-2H3zm11.293 3.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L15.586 11H8a1 1 0 110-2h7.586l-1.293-1.293a1 1 0 010-1.414z"/></svg>
+                </button>
             </div>
         </header>
+
         <div class="main-content">
+            <!-- Sidebar -->
             <aside id="sidebar">
                 <div class="sb-top">
                     <div class="dropdown" id="new-dropdown">
-                        <button id="new-btn" class="primary-btn"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/></svg> <span data-i18n="sidebar.new">New</span></button>
+                        <button id="new-btn" class="primary-btn">
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/></svg>
+                            <span data-i18n="sidebar.new">New</span>
+                        </button>
                         <div class="dropdown-menu" id="new-menu">
                             <button data-action="new-text" data-i18n="sidebar.textNote">Text Note</button>
                             <button data-action="new-sheet" data-i18n="sidebar.spreadsheet">Spreadsheet</button>
@@ -49,38 +98,111 @@
                             <button data-action="tpl-weekly" data-i18n="sidebar.weeklyReport">Weekly Report</button>
                         </div>
                     </div>
-                    <div class="search-wrap"><svg class="s-ico" width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/></svg><input type="text" id="search-input" data-i18n-ph="sidebar.search" placeholder="Search..."></div>
+                    <div class="search-wrap">
+                        <svg class="s-ico" width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/></svg>
+                        <input type="text" id="search-input" data-i18n-ph="sidebar.search" placeholder="Search...">
+                    </div>
                 </div>
+
                 <div class="folder-section">
                     <div class="folder-list" id="folder-list"></div>
                     <button id="add-folder-btn" class="add-folder-btn" data-i18n="sidebar.newFolder">+ New Folder</button>
                 </div>
+
+                <!-- Tag filter -->
+                <div class="tag-section" id="tag-section">
+                    <div class="tag-section-header">
+                        <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+                        <span data-i18n="sidebar.tags">Tags</span>
+                    </div>
+                    <div class="tag-filter-list" id="tag-filter-list"></div>
+                </div>
+
                 <div class="sb-divider"></div>
                 <div id="notes-list" class="notes-list"></div>
                 <div class="sb-footer"><span id="note-count">0</span></div>
             </aside>
+
+            <!-- Main editor area -->
             <main id="editor">
+                <!-- Empty state -->
                 <div id="editor-empty" class="editor-empty">
                     <svg width="72" height="72" viewBox="0 0 80 80" fill="none" opacity=".12"><rect x="12" y="8" width="40" height="56" rx="6" stroke="currentColor" stroke-width="3"/><path d="M22 24h20M22 32h16M22 40h12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="56" cy="56" r="16" stroke="currentColor" stroke-width="3"/><path d="M56 48v16M48 56h16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                     <p data-i18n="editor.empty">Select a note or create a new one</p>
+                    <p class="shortcut-hint muted small" data-i18n="editor.shortcutHint">Press ? for keyboard shortcuts</p>
                 </div>
+
                 <!-- Text editor -->
                 <div id="text-editor" class="editor-panel" style="display:none">
                     <div class="ed-header">
+                        <button id="back-btn" class="ico-btn mobile-only" data-i18n-title="editor.back" title="Back">
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"/></svg>
+                        </button>
                         <input type="text" id="note-title" data-i18n-ph="editor.untitled" placeholder="Untitled...">
                         <div class="ed-actions">
                             <span id="save-status"></span>
                             <span id="char-count" class="muted small"></span>
-                            <div class="dropdown" id="move-dropdown"><button class="ico-btn" data-i18n-title="editor.moveToFolder" title="Move to folder"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg></button><div class="dropdown-menu" id="move-menu"></div></div>
-                            <button id="del-btn" class="ico-btn danger-ico" data-i18n-title="editor.delete" title="Delete"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg></button>
-                            <button id="back-btn" class="ico-btn mobile-only" data-i18n-title="editor.back" title="Back"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"/></svg></button>
+                            <!-- Markdown toggle -->
+                            <button id="md-toggle-btn" class="sm-btn" data-i18n-title="editor.mdToggle" title="Toggle Markdown preview">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.5 4L7 10.5 8.5 9l1.5 2.5 2-1.5L15 14H5l.5-5z"/></svg>
+                                <span data-i18n="editor.markdown">MD</span>
+                            </button>
+                            <!-- Pin -->
+                            <button id="pin-btn" class="sm-btn" data-i18n-title="editor.pin" title="Pin note">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z"/></svg>
+                            </button>
+                            <!-- Export .md -->
+                            <button id="export-md-btn" class="sm-btn" data-i18n-title="editor.exportMd" title="Export as .md">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <!-- History -->
+                            <button id="history-btn" class="sm-btn" data-i18n-title="editor.history" title="Version history">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <!-- Print -->
+                            <button id="print-btn" class="sm-btn" data-i18n-title="editor.print" title="Print">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <!-- Tags -->
+                            <div class="dropdown" id="tag-dropdown">
+                                <button class="sm-btn" data-i18n-title="editor.tags" title="Tags">
+                                    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+                                </button>
+                                <div class="dropdown-menu tag-dropdown-menu" id="tag-menu">
+                                    <div class="tag-input-wrap">
+                                        <input type="text" id="tag-input" data-i18n-ph="editor.addTag" placeholder="Add tag...">
+                                        <button id="tag-add-btn" class="tag-add-confirm">+</button>
+                                    </div>
+                                    <div id="note-tags" class="note-tags-list"></div>
+                                </div>
+                            </div>
+                            <!-- Move to folder -->
+                            <div class="dropdown" id="move-dropdown">
+                                <button class="ico-btn" data-i18n-title="editor.moveToFolder" title="Move to folder">
+                                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                                </button>
+                                <div class="dropdown-menu" id="move-menu"></div>
+                            </div>
+                            <!-- Delete -->
+                            <button id="del-btn" class="ico-btn danger-ico" data-i18n-title="editor.delete" title="Delete">
+                                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg>
+                            </button>
                         </div>
                     </div>
+                    <!-- Tag chips row (shown below header when note has tags) -->
+                    <div id="editor-tags" class="editor-tags"></div>
+                    <!-- Textarea for editing -->
                     <textarea id="note-content" data-i18n-ph="editor.startWriting" placeholder="Start writing..."></textarea>
+                    <!-- Markdown preview (hidden by default) -->
+                    <div id="md-preview" class="md-preview" style="display:none"></div>
                 </div>
+
                 <!-- Sheet editor -->
                 <div id="sheet-editor" class="editor-panel" style="display:none">
                     <div class="ed-header">
+                        <button id="sheet-back-btn" class="ico-btn mobile-only" data-i18n-title="editor.back" title="Back">
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"/></svg>
+                        </button>
                         <input type="text" id="sheet-title" data-i18n-ph="editor.untitled" placeholder="Untitled...">
                         <div class="ed-actions">
                             <span id="sheet-save-status"></span>
@@ -88,17 +210,148 @@
                             <button id="sheet-add-col" class="sm-btn" data-i18n="editor.addCol">+ Col</button>
                             <button id="sheet-del-row" class="sm-btn ghost" data-i18n="editor.delRow">- Row</button>
                             <button id="sheet-del-col" class="sm-btn ghost" data-i18n="editor.delCol">- Col</button>
-                            <div class="dropdown" id="sheet-move-dropdown"><button class="ico-btn" data-i18n-title="editor.moveToFolder" title="Move to folder"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg></button><div class="dropdown-menu" id="sheet-move-menu"></div></div>
-                            <button id="sheet-del-btn" class="ico-btn danger-ico" data-i18n-title="editor.delete" title="Delete"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg></button>
-                            <button id="sheet-back-btn" class="ico-btn mobile-only" data-i18n-title="editor.back" title="Back"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"/></svg></button>
+                            <!-- Pin -->
+                            <button id="sheet-pin-btn" class="sm-btn" data-i18n-title="editor.pin" title="Pin note">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z"/></svg>
+                            </button>
+                            <!-- Export CSV -->
+                            <button id="export-csv-btn" class="sm-btn" data-i18n-title="editor.exportCsv" title="Export as .csv">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <!-- History -->
+                            <button id="sheet-history-btn" class="sm-btn" data-i18n-title="editor.history" title="Version history">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <!-- Print -->
+                            <button id="sheet-print-btn" class="sm-btn" data-i18n-title="editor.print" title="Print">
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd"/></svg>
+                            </button>
+                            <!-- Move to folder -->
+                            <div class="dropdown" id="sheet-move-dropdown">
+                                <button class="ico-btn" data-i18n-title="editor.moveToFolder" title="Move to folder">
+                                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                                </button>
+                                <div class="dropdown-menu" id="sheet-move-menu"></div>
+                            </div>
+                            <!-- Delete -->
+                            <button id="sheet-del-btn" class="ico-btn danger-ico" data-i18n-title="editor.delete" title="Delete">
+                                <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg>
+                            </button>
                         </div>
                     </div>
                     <div class="sheet-wrap" id="sheet-wrap"></div>
                 </div>
+
+                <!-- Trash view -->
+                <div id="trash-view" class="editor-panel" style="display:none">
+                    <div class="ed-header trash-header">
+                        <button id="trash-back-btn" class="ico-btn mobile-only" data-i18n-title="editor.back" title="Back">
+                            <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"/></svg>
+                        </button>
+                        <h3 class="trash-title">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg>
+                            <span data-i18n="trash.title">Trash</span>
+                        </h3>
+                        <div class="ed-actions">
+                            <button id="empty-trash-btn" class="sm-btn danger-text" data-i18n="trash.emptyAll">Empty Trash</button>
+                        </div>
+                    </div>
+                    <div class="trash-list" id="trash-list"></div>
+                    <div id="trash-empty" class="editor-empty">
+                        <svg width="48" height="48" viewBox="0 0 20 20" fill="currentColor" opacity=".1"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg>
+                        <p data-i18n="trash.empty">Trash is empty</p>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
+
+    <!-- History modal/overlay -->
+    <div id="history-overlay" class="modal-overlay" style="display:none">
+        <div class="modal-card history-modal">
+            <div class="modal-header">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                    <span data-i18n="history.title">Version History</span>
+                </h3>
+                <button id="history-close-btn" class="ico-btn" title="Close">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+            <div class="history-list" id="history-list"></div>
+            <div id="history-empty" class="history-empty-msg">
+                <p data-i18n="history.empty">No version history</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcuts modal -->
+    <div id="shortcuts-overlay" class="modal-overlay" style="display:none">
+        <div class="modal-card shortcuts-modal">
+            <div class="modal-header">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.293-1.953l.122-.122.123-.489H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/></svg>
+                    <span data-i18n="shortcuts.title">Keyboard Shortcuts</span>
+                </h3>
+                <button id="shortcuts-close-btn" class="ico-btn" title="Close">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+            <div class="shortcuts-body">
+                <div class="shortcut-group">
+                    <h4 data-i18n="shortcuts.general">General</h4>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>N</kbd><span data-i18n="shortcuts.newNote">New text note</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>S</kbd><span data-i18n="shortcuts.save">Save note</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>F</kbd><span data-i18n="shortcuts.search">Focus search</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>D</kbd><span data-i18n="shortcuts.toggleDark">Toggle dark mode</span></div>
+                    <div class="shortcut-row"><kbd>?</kbd><span data-i18n="shortcuts.showShortcuts">Show shortcuts</span></div>
+                </div>
+                <div class="shortcut-group">
+                    <h4 data-i18n="shortcuts.editor">Editor</h4>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>M</kbd><span data-i18n="shortcuts.toggleMd">Toggle Markdown preview</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>P</kbd><span data-i18n="shortcuts.print">Print</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>E</kbd><span data-i18n="shortcuts.export">Export</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>H</kbd><span data-i18n="shortcuts.historyKey">Version history</span></div>
+                    <div class="shortcut-row"><kbd>Esc</kbd><span data-i18n="shortcuts.closePanel">Close panel / Back</span></div>
+                </div>
+                <div class="shortcut-group">
+                    <h4 data-i18n="shortcuts.navigation">Navigation</h4>
+                    <div class="shortcut-row"><kbd>&uarr;</kbd>/<kbd>&darr;</kbd><span data-i18n="shortcuts.prevNext">Previous / Next note</span></div>
+                    <div class="shortcut-row"><kbd>Del</kbd><span data-i18n="shortcuts.deleteNote">Delete note</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conflict resolution dialog -->
+    <div id="conflict-overlay" class="modal-overlay" style="display:none">
+        <div class="modal-card conflict-modal">
+            <div class="modal-header">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                    <span data-i18n="conflict.title">Conflict Detected</span>
+                </h3>
+            </div>
+            <div class="conflict-body">
+                <p data-i18n="conflict.message">This note was modified elsewhere. Choose which version to keep:</p>
+                <div class="conflict-actions">
+                    <button id="conflict-keep-local" class="sm-btn" data-i18n="conflict.keepLocal">Keep Local</button>
+                    <button id="conflict-keep-remote" class="sm-btn" data-i18n="conflict.keepRemote">Keep Remote</button>
+                    <button id="conflict-merge" class="sm-btn" data-i18n="conflict.merge">Merge Both</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
     <div id="toast" class="toast"></div>
+
     <script src="app.js"></script>
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function(){});
+        }
+    </script>
 </body>
 </html>
