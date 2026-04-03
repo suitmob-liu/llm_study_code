@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Online Notes</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="login-card">
+            <h1>Online Notes</h1>
+            <p class="login-subtitle">Personal Note-Taking</p>
+            <form id="login-form">
+                <input type="text" id="username" placeholder="Username" required autocomplete="username">
+                <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+                <button type="submit" id="login-btn">Login</button>
+                <p id="login-error" class="error"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app-screen" class="screen" style="display:none">
+        <header>
+            <button id="menu-btn" class="mobile-only" aria-label="Menu">&#9776;</button>
+            <h2>Online Notes</h2>
+            <div class="header-right">
+                <span id="storage-info" class="header-tag"></span>
+                <span id="user-info" class="header-tag"></span>
+                <button id="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside id="sidebar">
+                <div class="sidebar-header">
+                    <button id="new-note-btn">+ New Note</button>
+                    <input type="text" id="search-input" placeholder="Search...">
+                </div>
+                <div id="notes-list"></div>
+            </aside>
+
+            <main id="editor">
+                <div id="editor-empty">
+                    <p>Select a note or create a new one</p>
+                </div>
+                <div id="editor-content" style="display:none">
+                    <div class="editor-header">
+                        <input type="text" id="note-title" placeholder="Title">
+                        <div class="editor-actions">
+                            <span id="save-status"></span>
+                            <button id="delete-note-btn" class="btn-danger">Delete</button>
+                            <button id="back-btn" class="mobile-only">Back</button>
+                        </div>
+                    </div>
+                    <textarea id="note-content" placeholder="Start writing..."></textarea>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
