@@ -19,7 +19,7 @@ download() {
 # Download cpp-httplib (header-only HTTP library)
 if [ ! -f "$DEPS_DIR/httplib.h" ]; then
     echo "Downloading cpp-httplib..."
-    download "https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h" "$DEPS_DIR/httplib.h"
+    download "https://raw.githubusercontent.com/yhirose/cpp-httplib/v0.15.3/httplib.h" "$DEPS_DIR/httplib.h"
     echo "cpp-httplib downloaded."
 fi
 

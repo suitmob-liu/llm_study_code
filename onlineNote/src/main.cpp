@@ -399,9 +399,10 @@ int main(int argc,char*argv[]){
     // Upload
     svr.Post("/api/upload",[&](const httplib::Request&r,httplib::Response&res){
         auto s=auth(r,res);if(!s)return;
-        if(!r.has_file("file")){res.status=400;res.set_content(R"({"error":"no file"})","application/json");return;}
-        auto f=r.get_file_value("file");int nid=0;
-        if(r.has_file("note_id"))try{nid=std::stoi(r.get_file_value("note_id").content);}catch(...){}
+        auto it=r.files.find("file");
+        if(it==r.files.end()){res.status=400;res.set_content(R"({"error":"no file"})","application/json");return;}
+        auto&f=it->second;int nid=0;
+        auto pit=r.files.find("note_id");if(pit!=r.files.end())try{nid=std::stoi(pit->second.content);}catch(...){}
         int id=db.save_attachment(s->user_id,nid,f.filename,f.content_type,f.content);
         if(id==-2){res.status=413;res.set_content(R"({"error":"too large"})","application/json");}
         else if(id==-1){res.status=507;res.set_content(R"({"error":"storage"})","application/json");}
