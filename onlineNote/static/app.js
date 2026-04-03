@@ -23,6 +23,18 @@ async function api(method, path, body) {
     return data;
 }
 
+// ==================== Toast ====================
+
+let toastTimer = null;
+function showToast(msg, duration) {
+    duration = duration || 2500;
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { el.classList.remove('show'); }, duration);
+}
+
 // ==================== Screens ====================
 
 function showLogin() {
@@ -39,6 +51,7 @@ function showApp(username) {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'flex';
     document.getElementById('user-info').textContent = username;
+    document.getElementById('user-avatar').textContent = username.charAt(0).toUpperCase();
     loadNotes();
     loadStorage();
 }
@@ -50,38 +63,49 @@ async function init() {
         const data = await api('GET', '/api/check');
         if (data.ok) showApp(data.username);
         else showLogin();
-    } catch {
+    } catch (e) {
         showLogin();
     }
 }
 
 // ==================== Auth ====================
 
-document.getElementById('login-form').addEventListener('submit', async (e) => {
+document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const btn = document.getElementById('login-btn');
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
+    var btn = document.getElementById('login-btn');
+    var username = document.getElementById('username').value.trim();
+    var password = document.getElementById('password').value;
 
     if (!username || !password) return;
 
     btn.disabled = true;
-    btn.textContent = 'Logging in...';
+    btn.querySelector('.btn-text').textContent = 'Signing in...';
     document.getElementById('login-error').textContent = '';
 
     try {
-        const data = await api('POST', '/api/login', { username, password });
+        var data = await api('POST', '/api/login', { username: username, password: password });
         showApp(data.username);
-    } catch {
+        showToast('Welcome back, ' + data.username);
+    } catch (err) {
         document.getElementById('login-error').textContent = 'Invalid username or password';
+        // Shake animation
+        var card = document.querySelector('.login-card');
+        card.style.animation = 'none';
+        card.offsetHeight; // trigger reflow
+        card.style.animation = 'shake 0.5s ease';
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Login';
+        btn.querySelector('.btn-text').textContent = 'Sign In';
     }
 });
 
-document.getElementById('logout-btn').addEventListener('click', async () => {
-    try { await api('POST', '/api/logout'); } catch {}
+// Add shake keyframe dynamically
+var shakeStyle = document.createElement('style');
+shakeStyle.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}';
+document.head.appendChild(shakeStyle);
+
+document.getElementById('logout-btn').addEventListener('click', async function() {
+    try { await api('POST', '/api/logout'); } catch (e) {}
     showLogin();
 });
 
@@ -89,39 +113,46 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 
 async function loadNotes() {
     try {
-        const data = await api('GET', '/api/notes');
+        var data = await api('GET', '/api/notes');
         notes = data.notes;
         renderNotesList();
-    } catch {}
+        updateNoteCount();
+    } catch (e) {}
+}
+
+function updateNoteCount() {
+    var el = document.getElementById('note-count');
+    el.textContent = notes.length + (notes.length === 1 ? ' note' : ' notes');
 }
 
 function renderNotesList(filter) {
-    const list = document.getElementById('notes-list');
+    var list = document.getElementById('notes-list');
     list.innerHTML = '';
 
-    let filtered = notes;
+    var filtered = notes;
     if (filter) {
-        const f = filter.toLowerCase();
-        filtered = notes.filter(n =>
-            n.title.toLowerCase().includes(f) ||
-            n.preview.toLowerCase().includes(f)
-        );
+        var f = filter.toLowerCase();
+        filtered = notes.filter(function(n) {
+            return n.title.toLowerCase().includes(f) || n.preview.toLowerCase().includes(f);
+        });
     }
 
     if (filtered.length === 0) {
-        list.innerHTML = '<div style="padding:40px 16px;text-align:center;color:#ccc;font-size:14px">' +
-            (notes.length === 0 ? 'No notes yet' : 'No matches') + '</div>';
+        var emptyDiv = document.createElement('div');
+        emptyDiv.style.cssText = 'padding:48px 16px;text-align:center;color:var(--text-muted);font-size:13px';
+        emptyDiv.textContent = notes.length === 0 ? 'No notes yet. Create one!' : 'No matching notes';
+        list.appendChild(emptyDiv);
         return;
     }
 
-    filtered.forEach(note => {
-        const item = document.createElement('div');
+    filtered.forEach(function(note) {
+        var item = document.createElement('div');
         item.className = 'note-item' + (note.id === currentNoteId ? ' active' : '');
         item.innerHTML =
             '<div class="note-item-title">' + escapeHtml(note.title || 'Untitled') + '</div>' +
             '<div class="note-item-preview">' + escapeHtml(note.preview) + '</div>' +
             '<div class="note-item-date">' + formatDate(note.updated_at) + '</div>';
-        item.addEventListener('click', () => openNote(note.id));
+        item.addEventListener('click', function() { openNote(note.id); });
         list.appendChild(item);
     });
 }
@@ -137,39 +168,71 @@ async function openNote(id) {
     }
 
     try {
-        const data = await api('GET', '/api/notes/' + id);
+        var data = await api('GET', '/api/notes/' + id);
         currentNoteId = id;
         document.getElementById('note-title').value = data.title;
         document.getElementById('note-content').value = data.content;
         document.getElementById('editor-empty').style.display = 'none';
         document.getElementById('editor-content').style.display = 'flex';
-        document.getElementById('save-status').textContent = '';
+        updateSaveStatus('');
+        updateCharCount(data.content);
         renderNotesList(document.getElementById('search-input').value);
 
         if (isMobile) {
             document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('editor').classList.add('visible');
         }
-    } catch {}
+    } catch (e) {}
 }
 
-document.getElementById('new-note-btn').addEventListener('click', async () => {
+document.getElementById('new-note-btn').addEventListener('click', async function() {
     try {
-        const data = await api('POST', '/api/notes', { title: 'New Note', content: '' });
+        var data = await api('POST', '/api/notes', { title: 'New Note', content: '' });
         await loadNotes();
         openNote(data.id);
+        showToast('Note created');
     } catch (err) {
         if (err.message.includes('storage')) {
-            alert('Storage limit exceeded!');
+            showToast('Storage limit exceeded!');
         }
     }
 });
 
+// Save status
+function updateSaveStatus(status) {
+    var el = document.getElementById('save-status');
+    el.className = '';
+    if (status === 'saving') {
+        el.textContent = 'Saving...';
+        el.className = 'saving';
+    } else if (status === 'saved') {
+        el.textContent = 'Saved';
+        el.className = 'saved';
+    } else if (status === 'error') {
+        el.textContent = 'Failed';
+        el.className = 'error';
+    } else {
+        el.textContent = '';
+    }
+}
+
+// Character count
+function updateCharCount(text) {
+    var el = document.getElementById('char-count');
+    if (!text) { el.textContent = ''; return; }
+    var chars = text.length;
+    if (chars >= 1000) {
+        el.textContent = (chars / 1000).toFixed(1) + 'k chars';
+    } else {
+        el.textContent = chars + ' chars';
+    }
+}
+
 // Auto-save with debounce
 function scheduleSave() {
-    document.getElementById('save-status').textContent = 'Editing...';
+    updateSaveStatus('saving');
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
+    saveTimer = setTimeout(async function() {
         saveTimer = null;
         await saveCurrentNote();
     }, 1500);
@@ -177,14 +240,14 @@ function scheduleSave() {
 
 async function saveCurrentNote() {
     if (!currentNoteId) return;
-    const title = document.getElementById('note-title').value;
-    const content = document.getElementById('note-content').value;
+    var title = document.getElementById('note-title').value;
+    var content = document.getElementById('note-content').value;
     try {
-        await api('PUT', '/api/notes/' + currentNoteId, { title, content });
-        document.getElementById('save-status').textContent = 'Saved';
+        await api('PUT', '/api/notes/' + currentNoteId, { title: title, content: content });
+        updateSaveStatus('saved');
 
         // Update sidebar preview
-        const note = notes.find(n => n.id === currentNoteId);
+        var note = notes.find(function(n) { return n.id === currentNoteId; });
         if (note) {
             note.title = title;
             note.preview = content.substring(0, 100);
@@ -192,18 +255,27 @@ async function saveCurrentNote() {
             renderNotesList(document.getElementById('search-input').value);
         }
         loadStorage();
-    } catch {
-        document.getElementById('save-status').textContent = 'Save failed';
+
+        // Clear status after a while
+        setTimeout(function() {
+            var el = document.getElementById('save-status');
+            if (el.textContent === 'Saved') updateSaveStatus('');
+        }, 3000);
+    } catch (e) {
+        updateSaveStatus('error');
     }
 }
 
 document.getElementById('note-title').addEventListener('input', scheduleSave);
-document.getElementById('note-content').addEventListener('input', scheduleSave);
+document.getElementById('note-content').addEventListener('input', function() {
+    scheduleSave();
+    updateCharCount(this.value);
+});
 
 // Delete
-document.getElementById('delete-note-btn').addEventListener('click', async () => {
+document.getElementById('delete-note-btn').addEventListener('click', async function() {
     if (!currentNoteId) return;
-    if (!confirm('Delete this note?')) return;
+    if (!confirm('Delete this note? This action cannot be undone.')) return;
 
     try {
         await api('DELETE', '/api/notes/' + currentNoteId);
@@ -212,18 +284,18 @@ document.getElementById('delete-note-btn').addEventListener('click', async () =>
         document.getElementById('editor-content').style.display = 'none';
         await loadNotes();
         loadStorage();
+        showToast('Note deleted');
 
         if (isMobile) {
             document.getElementById('sidebar').classList.remove('hidden');
             document.getElementById('editor').classList.remove('visible');
         }
-    } catch {}
+    } catch (e) {}
 });
 
 // ==================== Mobile Navigation ====================
 
-document.getElementById('back-btn').addEventListener('click', async () => {
-    // Save before going back
+document.getElementById('back-btn').addEventListener('click', async function() {
     if (saveTimer) {
         clearTimeout(saveTimer);
         saveTimer = null;
@@ -233,10 +305,9 @@ document.getElementById('back-btn').addEventListener('click', async () => {
     document.getElementById('editor').classList.remove('visible');
 });
 
-document.getElementById('menu-btn').addEventListener('click', () => {
-    const sidebar = document.getElementById('sidebar');
+document.getElementById('menu-btn').addEventListener('click', function() {
+    var sidebar = document.getElementById('sidebar');
     sidebar.classList.toggle('hidden');
-    // Hide editor when showing sidebar on mobile
     if (!sidebar.classList.contains('hidden') && isMobile) {
         document.getElementById('editor').classList.remove('visible');
     }
@@ -244,7 +315,7 @@ document.getElementById('menu-btn').addEventListener('click', () => {
 
 // ==================== Search ====================
 
-document.getElementById('search-input').addEventListener('input', (e) => {
+document.getElementById('search-input').addEventListener('input', function(e) {
     renderNotesList(e.target.value);
 });
 
@@ -252,45 +323,56 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 
 async function loadStorage() {
     try {
-        const data = await api('GET', '/api/storage');
-        const usedMB = (data.used / 1024 / 1024).toFixed(1);
-        const limitGB = (data.limit / 1024 / 1024 / 1024).toFixed(0);
+        var data = await api('GET', '/api/storage');
+        var usedMB = (data.used / 1024 / 1024).toFixed(1);
+        var limitGB = (data.limit / 1024 / 1024 / 1024).toFixed(0);
         document.getElementById('storage-info').textContent = usedMB + ' MB / ' + limitGB + ' GB';
-    } catch {}
+
+        var percent = Math.min((data.used / data.limit) * 100, 100);
+        var fill = document.getElementById('storage-bar-fill');
+        fill.style.width = percent + '%';
+        if (percent > 80) fill.style.background = 'var(--danger)';
+        else if (percent > 60) fill.style.background = '#f59e0b';
+        else fill.style.background = 'var(--primary)';
+    } catch (e) {}
 }
 
 // ==================== Utilities ====================
 
 function escapeHtml(str) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = str || '';
     return div.innerHTML;
 }
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
-    const d = new Date(dateStr.replace(' ', 'T') + 'Z');
-    const now = new Date();
+    var d = new Date(dateStr.replace(' ', 'T') + 'Z');
+    var now = new Date();
     if (isNaN(d.getTime())) return dateStr;
+
+    var diffMs = now - d;
+    var diffMin = Math.floor(diffMs / 60000);
+
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return diffMin + ' min ago';
 
     if (d.toDateString() === now.toDateString()) {
         return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     }
-    const yesterday = new Date(now);
+    var yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     if (d.toDateString() === yesterday.toDateString()) {
         return 'Yesterday ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     }
-    return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // ==================== Responsive ====================
 
-window.addEventListener('resize', () => {
-    const wasMobile = isMobile;
+window.addEventListener('resize', function() {
+    var wasMobile = isMobile;
     isMobile = window.innerWidth <= 768;
-
-    // Reset mobile classes when switching to desktop
     if (wasMobile && !isMobile) {
         document.getElementById('sidebar').classList.remove('hidden');
         document.getElementById('editor').classList.remove('visible');
@@ -298,7 +380,7 @@ window.addEventListener('resize', () => {
 });
 
 // Keyboard shortcut: Ctrl+S to save
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         if (saveTimer) {
