@@ -15,18 +15,16 @@ FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -s /bin/false appuser
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /build/server /build/manage_users ./
 COPY static/ static/
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh && mkdir -p data
 
-RUN mkdir -p data && chown -R appuser:appuser /app/data
-
-USER appuser
 VOLUME /app/data
 EXPOSE 8080
 
-ENTRYPOINT ["./server"]
-CMD ["-p", "8080"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["./server", "-p", "8080"]
