@@ -25,6 +25,7 @@ var I18N = {
     'list.noMatch':'No matching notes','list.empty':'No notes yet','list.sheet':'Sheet','list.text':'Text','list.spreadsheet':'Spreadsheet',
     'time.justNow':'Just now','time.minAgo':'{0} min ago','time.yesterday':'Yesterday',
     'tpl.newNote':'New Note','tpl.newSheet':'New Sheet','tpl.dailyTitle':'Daily Report - {0}','tpl.weeklyTitle':'Weekly Report - {0}',
+    'tpl.createdTime':'Created Time',
     'tpl.d.project':'Project','tpl.d.todayWork':"Today's Work",'tpl.d.tomorrowPlan':"Tomorrow's Plan",'tpl.d.progress':'Progress','tpl.d.notes':'Notes',
     'tpl.w.project':'Project','tpl.w.thisWeek':'This Week','tpl.w.nextWeek':'Next Week','tpl.w.completion':'Completion','tpl.w.risks':'Risks/Issues',
     'tags.add':'Add tag','tags.create':'Create tag','tags.delete':'Delete tag','tags.name':'Tag name','tags.color':'Color',
@@ -65,6 +66,7 @@ var I18N = {
     'list.noMatch':'没有匹配的笔记','list.empty':'暂无笔记','list.sheet':'表格','list.text':'文本','list.spreadsheet':'电子表格',
     'time.justNow':'刚刚','time.minAgo':'{0} 分钟前','time.yesterday':'昨天',
     'tpl.newNote':'新笔记','tpl.newSheet':'新表格','tpl.dailyTitle':'日报 - {0}','tpl.weeklyTitle':'周报 - {0}',
+    'tpl.createdTime':'创建时间',
     'tpl.d.project':'项目','tpl.d.todayWork':'今日完成','tpl.d.tomorrowPlan':'明日计划','tpl.d.progress':'进度','tpl.d.notes':'备注',
     'tpl.w.project':'项目','tpl.w.thisWeek':'本周完成','tpl.w.nextWeek':'下周计划','tpl.w.completion':'完成度','tpl.w.risks':'风险/问题',
     'tags.add':'添加标签','tags.create':'创建标签','tags.delete':'删除标签','tags.name':'标签名称','tags.color':'颜色',
@@ -105,6 +107,7 @@ var I18N = {
     'list.noMatch':'沒有符合的筆記','list.empty':'尚無筆記','list.sheet':'表格','list.text':'文字','list.spreadsheet':'試算表',
     'time.justNow':'剛才','time.minAgo':'{0} 分鐘前','time.yesterday':'昨天',
     'tpl.newNote':'新筆記','tpl.newSheet':'新表格','tpl.dailyTitle':'日報 - {0}','tpl.weeklyTitle':'週報 - {0}',
+    'tpl.createdTime':'建立時間',
     'tpl.d.project':'專案','tpl.d.todayWork':'今日完成','tpl.d.tomorrowPlan':'明日計畫','tpl.d.progress':'進度','tpl.d.notes':'備註',
     'tpl.w.project':'專案','tpl.w.thisWeek':'本週完成','tpl.w.nextWeek':'下週計畫','tpl.w.completion':'完成度','tpl.w.risks':'風險/問題',
     'tags.add':'新增標籤','tags.create':'建立標籤','tags.delete':'刪除標籤','tags.name':'標籤名稱','tags.color':'顏色',
@@ -601,12 +604,14 @@ document.getElementById('new-menu').querySelectorAll('button').forEach(function(
         else if (action === 'new-sheet') { title = t('tpl.newSheet'); content = JSON.stringify({data: mkEmpty(5,4), colWidths:[150,200,200,200,150]}); noteType = 'sheet'; }
         else if (action === 'tpl-daily') {
             title = t('tpl.dailyTitle', new Date().toISOString().slice(0,10));
-            var data = [[t('tpl.d.project'),t('tpl.d.todayWork'),t('tpl.d.tomorrowPlan'),t('tpl.d.progress'),t('tpl.d.notes')],['','','','',''],['','','','',''],['','','','',''],['','','','','']];
-            content = JSON.stringify({data:data, colWidths:[120,220,220,100,160]}); noteType = 'sheet';
+            var now = new Date(); var nowStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+            var data = [[t('tpl.createdTime'),t('tpl.d.project'),t('tpl.d.todayWork'),t('tpl.d.tomorrowPlan'),t('tpl.d.progress'),t('tpl.d.notes')],[nowStr,'','','','',''],['','','','','',''],['','','','','',''],['','','','','','']];
+            content = JSON.stringify({data:data, colWidths:[150,120,220,220,100,160]}); noteType = 'sheet';
         } else if (action === 'tpl-weekly') {
             title = t('tpl.weeklyTitle', getWeekStr());
-            var data2 = [[t('tpl.w.project'),t('tpl.w.thisWeek'),t('tpl.w.nextWeek'),t('tpl.w.completion'),t('tpl.w.risks')],['','','','',''],['','','','',''],['','','','',''],['','','','','']];
-            content = JSON.stringify({data:data2, colWidths:[120,220,220,110,180]}); noteType = 'sheet';
+            var now2 = new Date(); var nowStr2 = now2.getFullYear()+'-'+String(now2.getMonth()+1).padStart(2,'0')+'-'+String(now2.getDate()).padStart(2,'0')+' '+String(now2.getHours()).padStart(2,'0')+':'+String(now2.getMinutes()).padStart(2,'0');
+            var data2 = [[t('tpl.createdTime'),t('tpl.w.project'),t('tpl.w.thisWeek'),t('tpl.w.nextWeek'),t('tpl.w.completion'),t('tpl.w.risks')],[nowStr2,'','','','',''],['','','','','',''],['','','','','',''],['','','','','','']];
+            content = JSON.stringify({data:data2, colWidths:[150,120,220,220,110,180]}); noteType = 'sheet';
         }
         try { var d = await api('POST', '/api/notes', {title:title,content:content,folder_id:folderId,note_type:noteType});
             await loadNotes(); openNote(d.id); toast(t('toast.created'));
