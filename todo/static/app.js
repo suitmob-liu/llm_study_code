@@ -438,17 +438,27 @@
     };
 
     /**
-     * 根据选中的渠道更新 token 输入框的提示文本。
+     * 根据选中的渠道更新 token 输入框的提示文本和对应教程。
      */
     function updateNotifyHints() {
         const ch = notifyChannel.value;
+        const guideContainer = $('#notify-guide');
+
         if (ch && channelHints[ch]) {
             notifyTokenGroup.style.display = '';
             notifyTokenLabel.textContent = channelHints[ch].label;
             notifyToken.placeholder = channelHints[ch].placeholder;
             notifyHint.textContent = channelHints[ch].hint;
+
+            // 显示对应渠道的教程
+            guideContainer.style.display = '';
+            guideContainer.querySelectorAll('.guide-steps').forEach(g => {
+                g.style.display = g.dataset.guide === ch ? '' : 'none';
+            });
+            $('#guide-title').textContent = channelHints[ch].label + ' 配置教程';
         } else {
             notifyTokenGroup.style.display = 'none';
+            guideContainer.style.display = 'none';
         }
     }
 

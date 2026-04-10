@@ -239,19 +239,132 @@
             </form>
             <div id="notify-message" class="message"></div>
             <div id="notify-current-status" class="notify-status-bar"></div>
-            <div class="notify-guide">
-                <h3>如何获取 Token？</h3>
-                <div class="guide-item">
-                    <strong>WxPusher（推荐）：</strong>① 访问 wxpusher.zjiecode.com 微信扫码登录 → 新建应用获取 appToken ② 关注公众号「wxpusher」→ 点击「我的」→「我的UID」获取 UID ③ 填入格式：appToken|UID
+            <!-- 动态引导区：根据选择的渠道显示对应教程 -->
+            <div id="notify-guide" class="notify-guide" style="display:none">
+                <h3 id="guide-title">配置教程</h3>
+
+                <!-- WxPusher 引导 -->
+                <div class="guide-steps" data-guide="wxpusher">
+                    <div class="guide-badge">完全免费 · 2000条/天</div>
+                    <div class="guide-step">
+                        <span class="step-num">1</span>
+                        <div class="step-content">
+                            <div class="step-title">获取 appToken</div>
+                            <p>打开 <a href="https://wxpusher.zjiecode.com/admin" target="_blank" rel="noopener">wxpusher.zjiecode.com/admin</a>，用微信扫码登录</p>
+                            <p>进入后点击左侧「应用管理」→「新建应用」→ 填写应用名称（如"我的待办"）→ 创建后复制 <strong>appToken</strong></p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">2</span>
+                        <div class="step-content">
+                            <div class="step-title">获取 UID</div>
+                            <p>微信关注公众号 <strong>「wxpusher」</strong></p>
+                            <p>进入公众号 → 点击底部菜单「我的」→「我的UID」→ 复制 UID</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">3</span>
+                        <div class="step-content">
+                            <div class="step-title">关注应用</div>
+                            <p>回到 <a href="https://wxpusher.zjiecode.com/admin" target="_blank" rel="noopener">WxPusher 管理后台</a> → 点击你创建的应用 → 「应用二维码」</p>
+                            <p>用微信扫码关注该应用（这一步是让你的微信能收到这个应用的推送）</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">4</span>
+                        <div class="step-content">
+                            <div class="step-title">填入 Token</div>
+                            <p>在上方输入框填入，格式：</p>
+                            <code class="token-example">你的appToken|你的UID</code>
+                            <p>中间用英文竖线 <strong>|</strong> 分隔，然后点「保存设置」</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">5</span>
+                        <div class="step-content">
+                            <div class="step-title">测试</div>
+                            <p>保存后点击上方「立即发送」按钮，微信应收到待办提醒消息</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="guide-item">
-                    <strong>PushPlus：</strong>微信扫码关注公众号「pushplus」→ 登录 pushplus.plus → 复制首页的 token
+
+                <!-- PushPlus 引导 -->
+                <div class="guide-steps" data-guide="pushplus" style="display:none">
+                    <div class="guide-badge warn">免费版有限额 · 200条/天</div>
+                    <div class="guide-step">
+                        <span class="step-num">1</span>
+                        <div class="step-content">
+                            <div class="step-title">关注公众号</div>
+                            <p>微信搜索并关注公众号 <strong>「pushplus」</strong></p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">2</span>
+                        <div class="step-content">
+                            <div class="step-title">获取 Token</div>
+                            <p>打开 <a href="https://www.pushplus.plus" target="_blank" rel="noopener">pushplus.plus</a> → 微信扫码登录 → 首页即可看到你的 <strong>token</strong>，复制即可</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">3</span>
+                        <div class="step-content">
+                            <div class="step-title">填入并测试</div>
+                            <p>粘贴 token 到上方输入框 → 保存设置 → 点击「立即发送」测试</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="guide-item">
-                    <strong>Server酱：</strong>用 GitHub 登录 sct.ftqq.com → 微信扫码绑定 → 复制 SendKey
+
+                <!-- Server酱 引导 -->
+                <div class="guide-steps" data-guide="serverchan" style="display:none">
+                    <div class="guide-badge warn">免费版 · 5条/天</div>
+                    <div class="guide-step">
+                        <span class="step-num">1</span>
+                        <div class="step-content">
+                            <div class="step-title">登录绑定</div>
+                            <p>用 GitHub 账号登录 <a href="https://sct.ftqq.com" target="_blank" rel="noopener">sct.ftqq.com</a> → 微信扫码绑定</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">2</span>
+                        <div class="step-content">
+                            <div class="step-title">获取 SendKey</div>
+                            <p>登录后在「Key & API」页面复制 <strong>SendKey</strong></p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">3</span>
+                        <div class="step-content">
+                            <div class="step-title">填入并测试</div>
+                            <p>粘贴 SendKey 到上方输入框 → 保存设置 → 点击「立即发送」测试</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="guide-item">
-                    <strong>企业微信：</strong>群聊 → 添加群机器人 → 复制 Webhook 完整 URL
+
+                <!-- 企业微信 引导 -->
+                <div class="guide-steps" data-guide="wechat_work" style="display:none">
+                    <div class="guide-badge">仅推送到企业微信群</div>
+                    <div class="guide-step">
+                        <span class="step-num">1</span>
+                        <div class="step-content">
+                            <div class="step-title">创建群机器人</div>
+                            <p>打开企业微信 → 进入目标群聊 → 右上角设置 → 「群机器人」→「添加」</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">2</span>
+                        <div class="step-content">
+                            <div class="step-title">复制 Webhook URL</div>
+                            <p>创建后复制完整的 Webhook 地址</p>
+                            <code class="token-example">https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx</code>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <span class="step-num">3</span>
+                        <div class="step-content">
+                            <div class="step-title">填入并测试</div>
+                            <p>粘贴完整 URL 到上方输入框 → 保存设置 → 点击「立即发送」测试</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

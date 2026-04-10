@@ -1285,15 +1285,99 @@ body::after {
     margin-bottom: var(--space-md);
 }
 
-.guide-item {
+.guide-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 10px;
+    letter-spacing: 1px;
+    background: rgba(74, 140, 111, 0.2);
+    color: var(--jade);
+    margin-bottom: var(--space-md);
+}
+
+.guide-badge.warn {
+    background: rgba(196, 154, 42, 0.2);
+    color: var(--warning);
+}
+
+.guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.guide-step {
+    display: flex;
+    gap: var(--space-md);
+    align-items: flex-start;
+}
+
+.step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--vermillion);
+    color: var(--paper);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.step-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.step-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--paper);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.step-content p {
     font-size: 0.8rem;
     color: var(--ink-faint);
     line-height: 1.6;
-    margin-bottom: var(--space-sm);
+    margin-bottom: 4px;
 }
 
-.guide-item strong {
+.step-content p:last-child {
+    margin-bottom: 0;
+}
+
+.step-content strong {
     color: var(--paper-dim);
+}
+
+.step-content a {
+    color: var(--vermillion);
+    text-decoration: none;
+    border-bottom: 1px solid var(--vermillion-bg);
+    transition: border-color 0.2s;
+}
+
+.step-content a:hover {
+    border-color: var(--vermillion);
+}
+
+.token-example {
+    display: block;
+    background: var(--ink-medium);
+    border: 1px solid var(--ink-light);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--vermillion);
+    font-family: 'Courier New', monospace;
+    margin: 6px 0;
+    word-break: break-all;
 }
 
 
