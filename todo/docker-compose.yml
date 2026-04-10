@@ -1,0 +1,14 @@
+services:
+  todo:
+    build: .
+    container_name: todo-moji
+    restart: always
+    ports:
+      - "24175:24175"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TODO_SECRET_KEY=${TODO_SECRET_KEY:-}
+      - PUSHPLUS_TOKEN=${PUSHPLUS_TOKEN:-}
+      - SERVERCHAN_KEY=${SERVERCHAN_KEY:-}
+      - WECHAT_WEBHOOK_URL=${WECHAT_WEBHOOK_URL:-}

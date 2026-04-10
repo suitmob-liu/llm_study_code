@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待办 · 墨记</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>墨</text></svg>">
+</head>
+<body>
+    <!-- ===================== 登录/注册 ===================== -->
+    <div id="auth-page" class="page">
+        <div class="auth-container">
+            <div class="seal-stamp">墨记</div>
+            <h1 class="auth-title">待办事项</h1>
+            <p class="auth-subtitle">— 落笔有痕，事事分明 —</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">登录</button>
+                <button class="auth-tab" data-tab="register">注册</button>
+            </div>
+
+            <form id="login-form" class="auth-form">
+                <div class="input-group">
+                    <label>用户名</label>
+                    <input type="text" id="login-username" required autocomplete="username" placeholder="输入用户名">
+                </div>
+                <div class="input-group">
+                    <label>密码</label>
+                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="输入密码">
+                </div>
+                <button type="submit" class="btn-primary">进入</button>
+            </form>
+
+            <form id="register-form" class="auth-form" style="display:none">
+                <div class="input-group">
+                    <label>用户名</label>
+                    <input type="text" id="reg-username" required autocomplete="username" placeholder="3-20 字符">
+                </div>
+                <div class="input-group">
+                    <label>密码</label>
+                    <input type="password" id="reg-password" required autocomplete="new-password" placeholder="至少 6 字符">
+                </div>
+                <button type="submit" class="btn-primary">提交注册</button>
+                <p class="auth-hint">注册后需管理员审核通过方可使用</p>
+            </form>
+
+            <div id="auth-message" class="message"></div>
+        </div>
+        <div class="ink-drops">
+            <div class="drop drop-1"></div>
+            <div class="drop drop-2"></div>
+            <div class="drop drop-3"></div>
+        </div>
+    </div>
+
+    <!-- ===================== 主应用 ===================== -->
+    <div id="app-page" class="page" style="display:none">
+        <!-- 顶栏 -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="header-seal">墨</span>
+                <h1 class="header-title">待办 · 墨记</h1>
+            </div>
+            <div class="header-right">
+                <span id="user-info" class="user-badge"></span>
+                <button id="btn-notify" class="btn-icon" title="发送微信待办提醒">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </button>
+                <button id="btn-admin" class="btn-icon" title="管理面板" style="display:none">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+                </button>
+                <button id="btn-password" class="btn-icon" title="修改密码">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </button>
+                <button id="btn-logout" class="btn-icon" title="登出">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 新建待办 -->
+        <section class="new-todo-section">
+            <form id="todo-form" class="todo-form">
+                <div class="todo-form-main">
+                    <input type="text" id="todo-content" placeholder="落笔记事..." required class="todo-input">
+                    <button type="submit" class="btn-add">记</button>
+                </div>
+                <div class="todo-form-extra">
+                    <label class="deadline-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        截止日期
+                    </label>
+                    <input type="datetime-local" id="todo-deadline" class="deadline-input">
+                </div>
+            </form>
+        </section>
+
+        <!-- 过滤 -->
+        <section class="filter-section">
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">全部</button>
+                <button class="filter-tab" data-filter="pending">待办</button>
+                <button class="filter-tab" data-filter="completed">已完成</button>
+            </div>
+            <div class="todo-stats">
+                <span id="todo-count"></span>
+            </div>
+        </section>
+
+        <!-- 待办列表 -->
+        <section class="todo-list-section">
+            <div id="todo-list" class="todo-list"></div>
+            <div id="empty-state" class="empty-state" style="display:none">
+                <div class="empty-brush">空</div>
+                <p>清风明月，万事皆了</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- ===================== 管理员面板模态框 ===================== -->
+    <div id="admin-modal" class="modal" style="display:none">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>用户管理</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="admin-users" class="admin-users"></div>
+        </div>
+    </div>
+
+    <!-- ===================== 修改密码模态框 ===================== -->
+    <div id="password-modal" class="modal" style="display:none">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>修改密码</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="password-form">
+                <div class="input-group">
+                    <label>当前密码</label>
+                    <input type="password" id="old-password" required>
+                </div>
+                <div class="input-group">
+                    <label>新密码</label>
+                    <input type="password" id="new-password" required placeholder="至少 6 字符">
+                </div>
+                <button type="submit" class="btn-primary">确认修改</button>
+            </form>
+            <div id="password-message" class="message"></div>
+        </div>
+    </div>
+
+    <!-- ===================== 通知设置模态框 ===================== -->
+    <div id="notify-modal" class="modal" style="display:none">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>通知设置</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <p class="notify-desc">配置后点击铃铛即可将待办推送到你的微信。每位用户独立配置，互不影响。</p>
+            <form id="notify-form">
+                <div class="input-group">
+                    <label>推送渠道</label>
+                    <select id="notify-channel" class="select-input">
+                        <option value="">未配置（关闭推送）</option>
+                        <option value="pushplus">PushPlus（推荐，关注公众号即可）</option>
+                        <option value="serverchan">Server酱（需 GitHub 登录）</option>
+                        <option value="wechat_work">企业微信 Webhook</option>
+                    </select>
+                </div>
+                <div class="input-group" id="notify-token-group">
+                    <label id="notify-token-label">Token</label>
+                    <input type="text" id="notify-token" placeholder="">
+                    <p class="input-hint" id="notify-hint"></p>
+                </div>
+
+                <div class="schedule-section">
+                    <div class="section-divider">定时推送</div>
+                    <div class="input-group">
+                        <label>推送频率</label>
+                        <select id="notify-schedule" class="select-input">
+                            <option value="off">关闭定时推送（仅手动）</option>
+                            <option value="daily">每天推送</option>
+                            <option value="weekly">每周指定日推送</option>
+                        </select>
+                    </div>
+                    <div class="input-group" id="schedule-time-group" style="display:none">
+                        <label>推送时间</label>
+                        <input type="time" id="notify-time" value="09:00" class="time-input">
+                    </div>
+                    <div class="input-group" id="schedule-days-group" style="display:none">
+                        <label>推送日期</label>
+                        <div class="weekday-picker">
+                            <label class="weekday-chip"><input type="checkbox" value="1"><span>一</span></label>
+                            <label class="weekday-chip"><input type="checkbox" value="2"><span>二</span></label>
+                            <label class="weekday-chip"><input type="checkbox" value="3"><span>三</span></label>
+                            <label class="weekday-chip"><input type="checkbox" value="4"><span>四</span></label>
+                            <label class="weekday-chip"><input type="checkbox" value="5"><span>五</span></label>
+                            <label class="weekday-chip"><input type="checkbox" value="6"><span>六</span></label>
+                            <label class="weekday-chip"><input type="checkbox" value="7"><span>日</span></label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary">保存设置</button>
+            </form>
+            <div id="notify-message" class="message"></div>
+            <div class="notify-guide">
+                <h3>如何获取 Token？</h3>
+                <div class="guide-item">
+                    <strong>PushPlus：</strong>微信扫码关注公众号「pushplus」→ 登录 pushplus.plus → 复制首页的 token
+                </div>
+                <div class="guide-item">
+                    <strong>Server酱：</strong>用 GitHub 登录 sct.ftqq.com → 微信扫码绑定 → 复制 SendKey
+                </div>
+                <div class="guide-item">
+                    <strong>企业微信：</strong>群聊 → 添加群机器人 → 复制 Webhook 完整 URL
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== 通知弹窗 ===================== -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
