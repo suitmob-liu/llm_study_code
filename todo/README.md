@@ -56,18 +56,24 @@ sudo bash deploy.sh
 
 ## Docker 部署
 
+推荐使用一键部署脚本 `docker-deploy.sh`：
+
 ```bash
-# 一键启动
-docker compose up -d
+bash docker-deploy.sh            # 首次部署 / 修改代码后重新部署（保留数据）
+bash docker-deploy.sh clean      # 清理旧镜像后重新构建（保留数据）
+bash docker-deploy.sh stop       # 停止容器
+bash docker-deploy.sh logs       # 查看日志
+bash docker-deploy.sh status     # 查看运行状态
+bash docker-deploy.sh purge      # 彻底清理（删除容器+镜像+数据库），慎用
+```
 
-# 带微信推送通知（全局 fallback）
-PUSHPLUS_TOKEN="你的token" docker compose up -d
+日常修改代码后只需再次运行 `bash docker-deploy.sh`，脚本会自动停掉旧容器、重新构建、启动新容器，数据库不受影响。
 
-# 查看日志
-docker logs -f todo-moji
+也可以手动操作：
 
-# 停止
-docker compose down
+```bash
+docker compose up -d --build     # 构建并启动
+docker compose down              # 停止
 ```
 
 数据库文件持久化在 `./data/` 目录，容器重建不丢数据。
