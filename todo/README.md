@@ -21,7 +21,7 @@
 - 默认管理员账号 `admin / admin123`（请登录后立即修改）
 
 ### 微信推送通知
-- 支持三种渠道：**PushPlus**（推荐）/ **Server酱** / **企业微信 Webhook**
+- 支持四种渠道：**WxPusher**（推荐，完全免费）/ PushPlus / Server酱 / 企业微信 Webhook
 - **每个用户独立配置** 自己的推送 Token，互不影响
 - 管理员可设置全局环境变量作为未配置用户的 fallback
 - 点击铃铛图标手动发送待办摘要到微信
@@ -33,8 +33,13 @@
 - 每周模式可选择周一至周日任意组合
 - APScheduler 后台调度，每分钟检查一次自动发送
 
+### 主题切换
+- 五套主题可选：墨纸禅 / 春日笺 / 赛博霓虹 / 山林雾 / 落日沙
+- 点击顶栏太阳图标打开主题面板
+- localStorage 持久化用户选择，刷新不丢失
+- CSS 变量驱动，切换带过渡动画
+
 ### 前端设计
-- 墨纸禅风 UI：深色宣纸质感背景 + 朱红印章点缀
 - 字体：Noto Serif SC 宋体 + ZCOOL KuaiLe 书法字
 - 响应式设计，支持移动端
 - 入场动画、悬停交互、墨渍浮动装饰
@@ -56,7 +61,7 @@ sudo bash deploy.sh
 
 ## Docker 部署
 
-推荐使用一键部署脚本 `docker-deploy.sh`：
+推荐使用一键部署脚本 `docker-deploy.sh`（纯 docker 命令，不依赖 docker-compose）：
 
 ```bash
 bash docker-deploy.sh            # 首次部署 / 修改代码后重新部署（保留数据）
@@ -68,13 +73,6 @@ bash docker-deploy.sh purge      # 彻底清理（删除容器+镜像+数据库�
 ```
 
 日常修改代码后只需再次运行 `bash docker-deploy.sh`，脚本会自动停掉旧容器、重新构建、启动新容器，数据库不受影响。
-
-也可以手动操作：
-
-```bash
-docker compose up -d --build     # 构建并启动
-docker compose down              # 停止
-```
 
 数据库文件持久化在 `./data/` 目录，容器重建不丢数据。
 
@@ -102,11 +100,12 @@ cp .env.example .env
 
 ### 如何获取 Token
 
-| 渠道 | 获取方式 | 环境变量 |
-|------|----------|----------|
-| **PushPlus**（推荐） | 微信关注公众号「pushplus」→ 登录 pushplus.plus → 首页复制 token | `PUSHPLUS_TOKEN` |
-| **Server酱** | GitHub 登录 sct.ftqq.com → 微信扫码绑定 → 复制 SendKey | `SERVERCHAN_KEY` |
-| **企业微信** | 群聊 → 添加群机器人 → 复制 Webhook URL | `WECHAT_WEBHOOK_URL` |
+| 渠道 | 费用 | 每日额度 | 获取方式 | Token 格式 |
+|------|------|----------|----------|------------|
+| **WxPusher**（推荐） | 完全免费 | 2000条 | wxpusher.zjiecode.com 扫码登录 → 新建应用获取 appToken；关注公众号「wxpusher」→「我的」→「我的UID」 | `appToken\|UID` |
+| PushPlus | 免费版有限额 | 200条 | 关注公众号「pushplus」→ 登录 pushplus.plus → 首页复制 | token 字符串 |
+| Server酱 | 免费版有限 | 5条 | GitHub 登录 sct.ftqq.com → 微信扫码绑定 → 复制 SendKey | SendKey 字符串 |
+| 企业微信 | 免费 | 20条/分钟 | 群聊 → 添加群机器人 → 复制 Webhook URL | 完整 URL |
 
 详细示例见 `.env.example` 文件。
 
@@ -118,16 +117,18 @@ todo/
 ├── requirements.txt    # Python 依赖（Flask, requests, APScheduler）
 ├── start.sh            # 开发启动脚本
 ├── deploy.sh           # 生产部署脚本（systemd + gunicorn）
+├── docker-deploy.sh    # Docker 一键部署脚本（纯 docker 命令）
 ├── Dockerfile          # Docker 镜像构建
-├── docker-compose.yml  # Docker 编排配置
+├── docker-compose.yml  # Docker 编排配置（可选）
 ├── .env.example        # 环境变量配置示例
 ├── .gitignore          # Git 忽略规则
 ├── .dockerignore       # Docker 忽略规则
+├── RELEASE_NOTE.md     # 版本发布记录
 ├── README.md           # 本文件
 ├── data/               # 运行时自动创建，存放 todo.db
 └── static/
     ├── index.html      # 单页应用入口
-    ├── style.css       # 墨纸禅风样式
+    ├── style.css       # 主题样式（5套主题）
     └── app.js          # 前端全部逻辑
 ```
 
@@ -138,7 +139,7 @@ todo/
 - **前端**: 原生 HTML/CSS/JS，零依赖
 - **部署**: Docker / gunicorn + systemd
 - **认证**: SHA256 加盐哈希 + HttpOnly Cookie 会话
-- **通知**: PushPlus / Server酱 / 企业微信 Webhook
+- **通知**: WxPusher / PushPlus / Server酱 / 企业微信 Webhook
 - **字体**: Noto Serif SC + ZCOOL KuaiLe
 
 ## API 概览
