@@ -18,11 +18,16 @@ cd "$SCRIPT_DIR"
 
 CONTAINER_NAME="todo-moji"
 IMAGE_NAME="todo-todo"
-COMPOSE_CMD="docker compose"
+COMPOSE_CMD=""
 
-# 兼容旧版 docker-compose
-if ! docker compose version &>/dev/null 2>&1; then
+# 检测可用的 compose 命令
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
+else
+    echo -e "\033[0;31m[ERROR]\033[0m 未找到 docker compose 或 docker-compose，请先安装"
+    exit 1
 fi
 
 # 颜色输出
