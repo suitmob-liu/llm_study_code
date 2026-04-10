@@ -15,6 +15,58 @@
     let todos = [];
 
     // =========================================================================
+    // 主题切换
+    // =========================================================================
+
+    const THEMES = ['ink', 'spring', 'cyber', 'forest', 'desert'];
+
+    /**
+     * 应用指定主题并持久化到 localStorage。
+     *
+     * @param {string} theme - 主题名称 (ink/spring/cyber/forest/desert)
+     */
+    function applyTheme(theme) {
+        if (!THEMES.includes(theme)) theme = 'ink';
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('todo-theme', theme);
+        // 更新面板中的 active 状态
+        document.querySelectorAll('.theme-option').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === theme);
+        });
+    }
+
+    // 页面加载时恢复主题（尽早执行避免闪烁）
+    applyTheme(localStorage.getItem('todo-theme') || 'ink');
+
+    // 主题切换器交互
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnTheme = document.getElementById('btn-theme');
+        const themePanel = document.getElementById('theme-panel');
+
+        if (btnTheme && themePanel) {
+            btnTheme.addEventListener('click', (e) => {
+                e.stopPropagation();
+                themePanel.classList.toggle('open');
+            });
+
+            themePanel.addEventListener('click', (e) => {
+                const option = e.target.closest('.theme-option');
+                if (option) {
+                    applyTheme(option.dataset.theme);
+                    themePanel.classList.remove('open');
+                }
+            });
+
+            // 点击外部关闭
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.theme-switcher')) {
+                    themePanel.classList.remove('open');
+                }
+            });
+        }
+    });
+
+    // =========================================================================
     // DOM 引用
     // =========================================================================
 
