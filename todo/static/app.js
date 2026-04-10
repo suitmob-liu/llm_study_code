@@ -493,67 +493,71 @@
     }
 
     /**
-     * 打开通知设置模态框并加载当前配置。
+     * 打开通知设置模态框并加载当前配置和状态。
      *
      * @returns {Promise<void>}
      */
     async function openNotifySettings() {
         notifyModal.style.display = '';
         $('#notify-message').className = 'message';
+        const statusBar = $('#notify-current-status');
+
         try {
-            const data = await api('/api/notify/settings');
-            notifyChannel.value = data.channel || '';
+            // 并行加载设置和状态
+            const [settings, status] = await Promise.all([
+                api('/api/notify/settings'),
+                api('/api/notify/status'),
+            ]);
+
+            notifyChannel.value = settings.channel || '';
             notifyToken.value = '';
-            if (data.has_token) {
-                notifyToken.placeholder = `当前: ${data.token}（留空则不修改）`;
+            if (settings.has_token) {
+                notifyToken.placeholder = `当前: ${settings.token}（留空则不修改）`;
             }
-            notifySchedule.value = data.schedule || 'off';
-            $('#notify-time').value = data.time || '09:00';
-            setSelectedDays(data.days || []);
+            notifySchedule.value = settings.schedule || 'off';
+            $('#notify-time').value = settings.time || '09:00';
+            setSelectedDays(settings.days || []);
             updateNotifyHints();
             updateScheduleUI();
+
+            // 显示当前生效状态
+            if (status.configured) {
+                const sourceText = status.source === 'user' ? '你的个人配置' : '全局默认配置';
+                statusBar.textContent = `当前生效: ${status.label}（${sourceText}）`;
+                statusBar.className = 'notify-status-bar show';
+            } else {
+                statusBar.textContent = '未配置任何推送渠道，请先选择渠道并填入 Token';
+                statusBar.className = 'notify-status-bar show';
+            }
         } catch (err) {
             showToast(err.message, 'error');
         }
     }
 
-    // 铃铛：点击发送通知，长按打开设置
-    let notifyPressTimer = null;
-    const btnNotify = $('#btn-notify');
-
-    btnNotify.addEventListener('mousedown', () => {
-        notifyPressTimer = setTimeout(() => {
-            notifyPressTimer = 'long';
-            openNotifySettings();
-        }, 600);
-    });
-
-    btnNotify.addEventListener('mouseup', async () => {
-        if (notifyPressTimer === 'long') {
-            notifyPressTimer = null;
-            return;
-        }
-        clearTimeout(notifyPressTimer);
-        notifyPressTimer = null;
+    // 立即发送按钮
+    $('#btn-send-notify').addEventListener('click', async () => {
+        const msg = $('#notify-message');
         try {
             const status = await api('/api/notify/status');
             if (!status.configured) {
-                openNotifySettings();
+                msg.textContent = '请先选择渠道并保存设置';
+                msg.className = 'message show error';
                 return;
             }
-            showToast('正在发送...', '');
+            msg.textContent = '正在发送...';
+            msg.className = 'message show';
             const data = await api('/api/notify/send', { method: 'POST' });
-            showToast(data.message, 'success');
+            msg.textContent = data.message;
+            msg.className = 'message show success';
         } catch (err) {
-            showToast(err.message, 'error');
+            msg.textContent = err.message;
+            msg.className = 'message show error';
         }
     });
 
-    btnNotify.addEventListener('mouseleave', () => {
-        if (notifyPressTimer && notifyPressTimer !== 'long') {
-            clearTimeout(notifyPressTimer);
-            notifyPressTimer = null;
-        }
+    // 铃铛：点击打开通知设置面板
+    $('#btn-notify').addEventListener('click', () => {
+        openNotifySettings();
     });
 
     // 保存通知设置

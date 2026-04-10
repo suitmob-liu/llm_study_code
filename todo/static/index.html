@@ -232,9 +232,13 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-primary">保存设置</button>
+                <div class="notify-btn-row">
+                    <button type="submit" class="btn-primary">保存设置</button>
+                    <button type="button" id="btn-send-notify" class="btn-send">立即发送</button>
+                </div>
             </form>
             <div id="notify-message" class="message"></div>
+            <div id="notify-current-status" class="notify-status-bar"></div>
             <div class="notify-guide">
                 <h3>如何获取 Token？</h3>
                 <div class="guide-item">

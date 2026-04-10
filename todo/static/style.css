@@ -1227,6 +1227,51 @@ body::after {
     font-weight: 600;
 }
 
+.notify-btn-row {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+.notify-btn-row .btn-primary {
+    flex: 1;
+}
+
+.btn-send {
+    flex: 1;
+    padding: 14px;
+    background: var(--jade);
+    color: var(--paper);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    letter-spacing: 4px;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-out);
+}
+
+.btn-send:hover {
+    background: var(--jade-dim);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.notify-status-bar {
+    margin-top: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.8rem;
+    color: var(--paper-dim);
+    background: var(--ink-medium);
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.5px;
+    display: none;
+}
+
+.notify-status-bar.show {
+    display: block;
+}
+
 .notify-guide {
     margin-top: var(--space-lg);
     padding-top: var(--space-lg);
