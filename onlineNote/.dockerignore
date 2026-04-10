@@ -1,0 +1,7 @@
+deps/
+data/
+*.o
+server
+manage_users
+.git
+README.md

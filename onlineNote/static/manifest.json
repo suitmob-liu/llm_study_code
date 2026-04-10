@@ -1,0 +1,12 @@
+{
+    "name": "Online Notes",
+    "short_name": "Notes",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f4f4f8",
+    "theme_color": "#6366f1",
+    "description": "Personal note-taking with folders, spreadsheets and reports",
+    "icons": [
+        {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml"}
+    ]
+}
