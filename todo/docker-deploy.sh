@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================================
 # 待办·墨记 — Docker 一键部署/重部署脚本
+# 纯 docker 命令，不依赖 docker-compose
 #
 # 用法:
 #   bash docker-deploy.sh          # 构建并启动（保留数据）
@@ -17,17 +18,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 CONTAINER_NAME="todo-moji"
-IMAGE_NAME="todo-todo"
-COMPOSE_CMD=""
+IMAGE_NAME="todo-moji"
+PORT=24175
+DATA_DIR="${SCRIPT_DIR}/data"
 
-# 检测可用的 compose 命令
-if docker compose version >/dev/null 2>&1; then
-    COMPOSE_CMD="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-    COMPOSE_CMD="docker-compose"
-else
-    echo -e "\033[0;31m[ERROR]\033[0m 未找到 docker compose 或 docker-compose，请先安装"
-    exit 1
+# 从 .env 文件加载环境变量（如果存在）
+ENV_ARGS=""
+if [ -f ".env" ]; then
+    while IFS='=' read -r key value; do
+        # 跳过注释和空行
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        # 去除行尾空格
+        value=$(echo "$value" | sed 's/[[:space:]]*$//')
+        [ -n "$value" ] && ENV_ARGS="${ENV_ARGS} -e ${key}=${value}"
+    done < .env
 fi
 
 # 颜色输出
@@ -59,8 +63,9 @@ show_status() {
 # ------------------------------------------------------------
 stop_container() {
     if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-        info "停止容器 ${CONTAINER_NAME}..."
-        $COMPOSE_CMD down
+        info "停止并移除容器 ${CONTAINER_NAME}..."
+        docker stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+        docker rm "${CONTAINER_NAME}" >/dev/null 2>&1 || true
     fi
 }
 
@@ -69,16 +74,15 @@ stop_container() {
 # ------------------------------------------------------------
 clean_images() {
     info "清理旧镜像..."
-    # 删除悬空镜像（none标签）
+    # 删除悬空镜像
     dangling=$(docker images -f "dangling=true" -q 2>/dev/null)
     if [ -n "$dangling" ]; then
         docker rmi $dangling 2>/dev/null || true
         info "已清理悬空镜像"
     fi
     # 删除本项目旧镜像
-    old_images=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep "${IMAGE_NAME}" | awk '{print $2}')
-    if [ -n "$old_images" ]; then
-        docker rmi $old_images 2>/dev/null || true
+    if docker images --format '{{.Repository}}' | grep -q "^${IMAGE_NAME}$"; then
+        docker rmi "${IMAGE_NAME}" 2>/dev/null || true
         info "已清理项目旧镜像"
     fi
 }
@@ -87,24 +91,32 @@ clean_images() {
 # 构建并启动
 # ------------------------------------------------------------
 build_and_start() {
-    info "构建镜像..."
-    $COMPOSE_CMD build --no-cache
+    # 确保数据目录存在
+    mkdir -p "${DATA_DIR}"
 
-    info "启动容器..."
-    $COMPOSE_CMD up -d
+    info "构建镜像 ${IMAGE_NAME}..."
+    docker build --no-cache -t "${IMAGE_NAME}" .
+
+    info "启动容器 ${CONTAINER_NAME}..."
+    docker run -d \
+        --name "${CONTAINER_NAME}" \
+        --restart always \
+        -p "${PORT}:${PORT}" \
+        -v "${DATA_DIR}:/app/data" \
+        ${ENV_ARGS} \
+        "${IMAGE_NAME}"
 
     # 等待启动
     sleep 2
     if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo ""
         info "部署成功！"
-        PORT=$(docker port "${CONTAINER_NAME}" 24175 2>/dev/null | head -1 | cut -d: -f2)
-        info "访问地址: http://<服务器IP>:${PORT:-24175}"
+        info "访问地址: http://<服务器IP>:${PORT}"
         info "管理员: admin / admin123"
         echo ""
     else
         error "启动失败，查看日志："
-        $COMPOSE_CMD logs --tail 20
+        docker logs --tail 30 "${CONTAINER_NAME}" 2>&1 || true
         exit 1
     fi
 }
@@ -145,8 +157,8 @@ case "$ACTION" in
         fi
         stop_container
         clean_images
-        if [ -d "data" ]; then
-            rm -rf data
+        if [ -d "${DATA_DIR}" ]; then
+            rm -rf "${DATA_DIR}"
             info "已删除数据库目录 data/"
         fi
         info "清理完成。再次运行 bash docker-deploy.sh 可重新部署。"
@@ -161,7 +173,7 @@ case "$ACTION" in
         ;;
 
     logs)
-        $COMPOSE_CMD logs -f --tail 100
+        docker logs -f --tail 100 "${CONTAINER_NAME}"
         ;;
 
     status)
