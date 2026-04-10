@@ -9,6 +9,8 @@ services:
       - ./data:/app/data
     environment:
       - TODO_SECRET_KEY=${TODO_SECRET_KEY:-}
+      - WXPUSHER_APPTOKEN=${WXPUSHER_APPTOKEN:-}
+      - WXPUSHER_UID=${WXPUSHER_UID:-}
       - PUSHPLUS_TOKEN=${PUSHPLUS_TOKEN:-}
       - SERVERCHAN_KEY=${SERVERCHAN_KEY:-}
       - WECHAT_WEBHOOK_URL=${WECHAT_WEBHOOK_URL:-}

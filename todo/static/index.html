@@ -192,8 +192,9 @@
                     <label>推送渠道</label>
                     <select id="notify-channel" class="select-input">
                         <option value="">未配置（关闭推送）</option>
-                        <option value="pushplus">PushPlus（推荐，关注公众号即可）</option>
-                        <option value="serverchan">Server酱（需 GitHub 登录）</option>
+                        <option value="wxpusher">WxPusher（推荐，完全免费）</option>
+                        <option value="pushplus">PushPlus</option>
+                        <option value="serverchan">Server酱</option>
                         <option value="wechat_work">企业微信 Webhook</option>
                     </select>
                 </div>
@@ -236,6 +237,9 @@
             <div id="notify-message" class="message"></div>
             <div class="notify-guide">
                 <h3>如何获取 Token？</h3>
+                <div class="guide-item">
+                    <strong>WxPusher（推荐）：</strong>① 访问 wxpusher.zjiecode.com 微信扫码登录 → 新建应用获取 appToken ② 关注公众号「wxpusher」→ 点击「我的」→「我的UID」获取 UID ③ 填入格式：appToken|UID
+                </div>
                 <div class="guide-item">
                     <strong>PushPlus：</strong>微信扫码关注公众号「pushplus」→ 登录 pushplus.plus → 复制首页的 token
                 </div>

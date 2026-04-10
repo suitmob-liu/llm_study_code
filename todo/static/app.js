@@ -431,6 +431,7 @@
     const scheduleDaysGroup = $('#schedule-days-group');
 
     const channelHints = {
+        wxpusher: { label: 'appToken|UID', placeholder: 'AT_xxx...|UID_xxx...', hint: 'appToken 和 UID 用竖线 | 分隔，完全免费' },
         pushplus: { label: 'PushPlus Token', placeholder: '粘贴你的 PushPlus token', hint: '在 pushplus.plus 首页复制' },
         serverchan: { label: 'Server酱 SendKey', placeholder: '粘贴你的 SendKey', hint: '在 sct.ftqq.com 复制' },
         wechat_work: { label: 'Webhook URL', placeholder: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...', hint: '企业微信群机器人完整 URL' },

@@ -27,12 +27,15 @@ app.permanent_session_lifetime = timedelta(days=7)
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'todo.db')
 MAX_USERS = 10
 
-# 通知渠道配置（任选其一即可）
-# 方式1: PushPlus — 关注公众号"pushplus"获取 token，推送到个人微信
+# 通知渠道配置（任选其一即可，全局 fallback）
+# 方式1: WxPusher（推荐，完全免费，2000条/天）— wxpusher.zjiecode.com
+WXPUSHER_APPTOKEN = os.environ.get('WXPUSHER_APPTOKEN', '')
+WXPUSHER_UID = os.environ.get('WXPUSHER_UID', '')
+# 方式2: PushPlus — 关注公众号"pushplus"获取 token
 PUSHPLUS_TOKEN = os.environ.get('PUSHPLUS_TOKEN', '')
-# 方式2: Server酱 — https://sct.ftqq.com 获取 SendKey
+# 方式3: Server酱 — https://sct.ftqq.com 获取 SendKey
 SERVERCHAN_KEY = os.environ.get('SERVERCHAN_KEY', '')
-# 方式3: 企业微信 Webhook（保留兼容）
+# 方式4: 企业微信 Webhook
 WECHAT_WEBHOOK_URL = os.environ.get('WECHAT_WEBHOOK_URL', '')
 
 
@@ -692,6 +695,7 @@ def admin_delete_user(user_id):
 # =============================================================================
 
 CHANNEL_LABELS = {
+    'wxpusher': 'WxPusher 微信推送',
     'pushplus': 'PushPlus 微信推送',
     'serverchan': 'Server酱 微信推送',
     'wechat_work': '企业微信 Webhook',
@@ -761,7 +765,7 @@ def save_notify_settings():
     notify_time = data.get('time', '09:00').strip()
     days = data.get('days', [])
 
-    valid_channels = ('pushplus', 'serverchan', 'wechat_work', '')
+    valid_channels = ('wxpusher', 'pushplus', 'serverchan', 'wechat_work', '')
     if channel not in valid_channels:
         return jsonify({'error': '无效的通知渠道'}), 400
 
@@ -828,6 +832,42 @@ def _build_todo_message(username, todos):
         html_lines.append(f"<li>{t['content']}{deadline_str}</li>")
     html_lines.append("</ul>")
     return title, "\n".join(lines), "\n".join(html_lines)
+
+
+def _send_wxpusher(token, title, html_content):
+    """
+    通过 WxPusher 发送微信推送。
+
+    token 格式为 "appToken|uid"，用竖线分隔。
+
+    Args:
+        token (str): "appToken|uid" 格式的凭证
+        title (str): 消息标题
+        html_content (str): HTML 格式消息内容
+
+    Returns:
+        tuple: (success: bool, error_msg: str)
+    """
+    parts = token.split('|', 1)
+    if len(parts) != 2:
+        return False, "token 格式错误，需要 appToken|UID"
+    app_token, uid = parts[0].strip(), parts[1].strip()
+
+    resp = http_requests.post(
+        "https://wxpusher.zjiecode.com/api/send/message",
+        json={
+            "appToken": app_token,
+            "content": html_content,
+            "summary": title,
+            "contentType": 2,
+            "uids": [uid],
+        },
+        timeout=10
+    )
+    data = resp.json()
+    if data.get("code") == 1000:
+        return True, ""
+    return False, data.get("msg", f"状态码 {resp.status_code}")
 
 
 def _send_pushplus(token, title, html_content):
@@ -924,6 +964,8 @@ def _resolve_user_channel(user_id):
         return ch, user['notify_token'], CHANNEL_LABELS.get(ch, ch)
 
     # 回退到全局环境变量
+    if WXPUSHER_APPTOKEN and WXPUSHER_UID:
+        return 'wxpusher', f"{WXPUSHER_APPTOKEN}|{WXPUSHER_UID}", 'WxPusher (全局)'
     if PUSHPLUS_TOKEN:
         return 'pushplus', PUSHPLUS_TOKEN, 'PushPlus (全局)'
     if SERVERCHAN_KEY:
@@ -964,7 +1006,9 @@ def notify_send():
     title, plain_text, html_text = _build_todo_message(g.user['username'], todos)
 
     try:
-        if channel == 'pushplus':
+        if channel == 'wxpusher':
+            ok, err = _send_wxpusher(token, title, html_text)
+        elif channel == 'pushplus':
             ok, err = _send_pushplus(token, title, html_text)
         elif channel == 'serverchan':
             ok, err = _send_serverchan(token, title, plain_text)
@@ -1061,7 +1105,9 @@ def _send_notify_for_user(user_row):
 
     # 回退到全局
     if not channel or not token:
-        if PUSHPLUS_TOKEN:
+        if WXPUSHER_APPTOKEN and WXPUSHER_UID:
+            channel, token = 'wxpusher', f"{WXPUSHER_APPTOKEN}|{WXPUSHER_UID}"
+        elif PUSHPLUS_TOKEN:
             channel, token = 'pushplus', PUSHPLUS_TOKEN
         elif SERVERCHAN_KEY:
             channel, token = 'serverchan', SERVERCHAN_KEY
@@ -1084,7 +1130,9 @@ def _send_notify_for_user(user_row):
     title, plain_text, html_text = _build_todo_message(user_row['username'], todos)
 
     try:
-        if channel == 'pushplus':
+        if channel == 'wxpusher':
+            ok, _ = _send_wxpusher(token, title, html_text)
+        elif channel == 'pushplus':
             ok, _ = _send_pushplus(token, title, html_text)
         elif channel == 'serverchan':
             ok, _ = _send_serverchan(token, title, plain_text)
