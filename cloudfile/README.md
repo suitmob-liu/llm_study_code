@@ -16,10 +16,28 @@
 
 ### 用 Docker（推荐）
 
+**一键部署**（清旧容器 + 构建 + 启动 + 健康检查，默认端口 **5494**）：
+
 ```bash
-docker compose up --build
-curl http://localhost:8080/api/health
-# {"status":"ok","service":"cloudfile_backend","version":"0.1.0"}
+scripts/deploy.sh
+```
+
+服务就绪后：`curl http://localhost:5494/api/health`。
+
+常用参数：
+
+```bash
+scripts/deploy.sh --port 8080    # 指定其他端口
+scripts/deploy.sh --no-build     # 跳过构建（容器已构建过）
+scripts/deploy.sh --logs         # 部署后跟踪日志
+scripts/deploy.sh --purge        # 删除数据 volume 后重部署（慎用！会丢所有文档）
+```
+
+**手动方式**（不用脚本）：
+
+```bash
+HOST_PORT=5494 docker compose up --build -d
+curl http://localhost:5494/api/health
 ```
 
 ### 本地开发（Linux/WSL）
