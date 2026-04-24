@@ -1,6 +1,6 @@
 find_package(Drogon CONFIG REQUIRED)
 find_package(SQLiteCpp CONFIG REQUIRED)
-find_package(unofficial-git2 CONFIG REQUIRED)
+find_package(libgit2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
@@ -23,7 +23,7 @@ target_link_libraries(cloudfile_backend
     PRIVATE
         Drogon::Drogon
         SQLiteCpp
-        unofficial::git2::git2
+        libgit2::libgit2package
         nlohmann_json::nlohmann_json
         spdlog::spdlog
         fmt::fmt
