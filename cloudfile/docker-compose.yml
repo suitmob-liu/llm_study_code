@@ -6,8 +6,9 @@ services:
     image: cloudfile-backend:local
     container_name: cloudfile-backend
     restart: unless-stopped
+    # 宿主机端口默认 5494（可通过 HOST_PORT 环境变量覆盖）；容器内固定 8080
     ports:
-      - "${HOST_PORT:-8080}:8080"
+      - "${HOST_PORT:-5494}:8080"
     environment:
       CLOUDFILE_HOST: "0.0.0.0"
       CLOUDFILE_PORT: "8080"
