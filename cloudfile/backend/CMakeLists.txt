@@ -6,28 +6,43 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(unofficial-sodium CONFIG REQUIRED)
 
+# 共享库：被 backend exe 和 admin_cli exe 共同使用的 domain/storage 代码
+# 放成 static lib 避免编两遍 + 保证行为一致
+set(CLOUDFILE_CORE_SOURCES
+    src/storage/db.cpp
+    src/domain/password.cpp
+    src/domain/user.cpp
+)
+
+add_library(cloudfile_core STATIC ${CLOUDFILE_CORE_SOURCES})
+
+target_include_directories(cloudfile_core
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(cloudfile_core
+    PUBLIC
+        SQLiteCpp
+        spdlog::spdlog
+        fmt::fmt
+        unofficial-sodium::sodium
+)
+
+# backend HTTP 服务
 set(BACKEND_SOURCES
     src/main.cpp
-    src/storage/db.cpp
     src/api/health_controller.cpp
 )
 
 add_executable(cloudfile_backend ${BACKEND_SOURCES})
 
-target_include_directories(cloudfile_backend
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
 target_link_libraries(cloudfile_backend
     PRIVATE
+        cloudfile_core
         Drogon::Drogon
-        SQLiteCpp
         libgit2::libgit2package
         nlohmann_json::nlohmann_json
-        spdlog::spdlog
-        fmt::fmt
-        unofficial-sodium::sodium
 )
 
 # Phase 0 还没写测试。tests/ 目录里有 CMakeLists.txt 才会启用——

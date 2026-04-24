@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - [`DESIGN.md`](DESIGN.md)：产品定位、3 个实现方案对比、工程决策（原子性、并发锁、MCP 路径等 8 项）、测试策略、3 周实施计划
   - [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md)：Warm Scholar 视觉方向，CSS 变量 token（琥珀 `#D97706` 主色 + 卡其白 `#FFFBF5`）、DM Sans + Newsreader + JetBrains Mono 字体栈、AI 活动专属 token（wiki link 四种状态、AI 横幅等）
 - [`README.md`](README.md) 快速开始 + 技术栈 + 目录结构 + 环境变量 + Phase 路线图。
+- **Phase 1a-1 管理员初始化**：
+  - `domain/password`：libsodium Argon2id 封装（OPSLIMIT/MEMLIMIT_INTERACTIVE），长度校验 12-1024
+  - `domain/user`：users 表 CRUD + 登录查询（支持 username 或 email）+ 计数
+  - `storage/Database::init()` / `::instance()` 单例——backend 和 admin_cli 共用一套连接语义
+  - `cloudfile_admin init-admin` CLI 命令：密码优先从环境变量 `CLOUDFILE_INITIAL_ADMIN_PASSWORD` 读，回落到 tty echo-off 交互输入。默认 username=admin / email=admin@localhost，可用 `--username` / `--email` 覆盖。幂等：同名 admin 已存在时静默成功；已有其他用户则拒绝
+  - 静态库 `cloudfile_core`：把 domain/storage 抽成单独 library，backend 和 admin_cli 共享编译产物（不用编两遍 .cpp）
 
 ### Changed
 

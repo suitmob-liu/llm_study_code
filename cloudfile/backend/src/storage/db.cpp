@@ -85,7 +85,7 @@ constexpr int kLatestVersion = sizeof(kMigrations) / sizeof(kMigrations[0]);
 
 }  // anonymous namespace
 
-Database::Database(const std::filesystem::path& db_path) {
+Database::Database(const std::filesystem::path& db_path) : path_(db_path) {
     spdlog::info("Opening SQLite at {}", db_path.string());
     db_ = std::make_unique<SQLite::Database>(
         db_path.string(),
@@ -97,6 +97,30 @@ Database::Database(const std::filesystem::path& db_path) {
     db_->exec("PRAGMA synchronous = NORMAL");
 
     run_migrations();
+}
+
+namespace {
+std::unique_ptr<Database> g_instance;
+std::mutex g_init_mutex;
+}  // anonymous namespace
+
+Database& Database::init(const std::filesystem::path& db_path) {
+    std::scoped_lock lock(g_init_mutex);
+    if (g_instance) {
+        if (g_instance->path_ != db_path) {
+            throw std::logic_error("Database::init called with different path");
+        }
+        return *g_instance;
+    }
+    g_instance = std::unique_ptr<Database>(new Database(db_path));
+    return *g_instance;
+}
+
+Database& Database::instance() {
+    if (!g_instance) {
+        throw std::logic_error("Database::instance() called before init()");
+    }
+    return *g_instance;
 }
 
 int Database::schema_version() {

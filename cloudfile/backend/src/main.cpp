@@ -63,9 +63,11 @@ int main() {
     // 确保数据目录存在
     std::filesystem::create_directories(config.data_root);
 
-    // 打开数据库（副作用：跑 schema 迁移）
+    // 打开数据库（singleton；副作用：跑 schema 迁移）
+    // 用 init 而不是局部变量——以后 controller/filter 可以 Database::instance() 取
     try {
-        cloudfile::storage::Database db(config.data_root / "cloudfile.sqlite");
+        auto& db = cloudfile::storage::Database::init(
+            config.data_root / "cloudfile.sqlite");
         spdlog::info("database schema at v{}", db.schema_version());
     } catch (const std::exception& e) {
         spdlog::critical("database init failed: {}", e.what());
