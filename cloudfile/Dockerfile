@@ -7,7 +7,10 @@
 # ============================================================
 FROM ubuntu:24.04 AS builder
 
-ARG VCPKG_COMMIT=2026.03.15
+# VCPKG_REF 可以是 branch 或 tag。默认 master（首次能跑起来优先于可复现）。
+# 生产用法：构建时传 --build-arg VCPKG_REF=<known-good-sha 或 tag>
+# 真实 release tag 列表见 https://github.com/microsoft/vcpkg/releases
+ARG VCPKG_REF=master
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -29,11 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 vcpkg
-RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+# 安装 vcpkg（shallow clone 省时间；--branch 同时接 branch 和 tag）
+RUN git clone --depth 1 --branch "${VCPKG_REF}" \
+        https://github.com/microsoft/vcpkg.git /opt/vcpkg \
     && cd /opt/vcpkg \
-    && git checkout ${VCPKG_COMMIT} \
-    && ./bootstrap-vcpkg.sh -disableMetrics
+    && ./bootstrap-vcpkg.sh -disableMetrics \
+    && echo "vcpkg HEAD: $(git rev-parse HEAD)"
 
 ENV VCPKG_ROOT=/opt/vcpkg
 ENV PATH=$PATH:/opt/vcpkg

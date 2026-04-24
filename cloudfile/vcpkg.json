@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "cloudfile",
   "version": "0.1.0",
   "description": "Self-hosted AI-first cloud document system",
@@ -14,6 +15,5 @@
       "name": "gtest",
       "features": []
     }
-  ],
-  "builtin-baseline": "2026.03.15"
+  ]
 }

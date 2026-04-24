@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/deploy.sh` 在 `sh deploy.sh` 调用下崩溃（Ubuntu 的 `/bin/sh` 是 Dash，不支持 `set -o pipefail`、`[[ ]]`、数组等 bashism；shebang `#!/usr/bin/env bash` 在 `sh script.sh` 调用方式下被忽略）。修复：脚本起始加 `BASH_VERSION` 自检，非 bash 环境自动 `exec bash "$0" "$@"`；同时把 `+x` 位打进 git index，checkout 后可直接 `./deploy.sh`。
 - `scripts/deploy.sh` 在只有 `docker-compose` v1 的机器上直接报错退出。修复：自动检测 `docker compose` v2（plugin）和 `docker-compose` v1，优先 v2，回落到 v1，并对 v1 打 EOL 警告但继续执行。脚本内全部 compose 调用走检测到的命令。
 - `Dockerfile` 的 `useradd -r -u 1000` 在 Ubuntu 24.04 基础镜像上冲突（24.04 从 Ubuntu 23.10 起预置了 UID 1000 的 `ubuntu` 用户）。改用 UID 1500 避开默认用户，保持固定 UID 以确保 volume ownership 跨重启一致。
+- `Dockerfile` 的 `VCPKG_COMMIT=2026.03.15` 和 `vcpkg.json` 的 `builtin-baseline: 2026.03.15` 是 Phase 0 commit 里的占位假值，vcpkg 对应的 tag/commit 不存在导致 `git checkout` 失败。修复：Dockerfile 改用 `VCPKG_REF=master`（shallow clone），`vcpkg.json` 移除 `builtin-baseline`（让 vcpkg 使用仓库 HEAD 作为默认 baseline）。未来需要复现性再通过 `--build-arg VCPKG_REF=<known-good-sha-or-tag>` 固定。
 
 ### Not Yet Implemented (Phase 1+)
 
