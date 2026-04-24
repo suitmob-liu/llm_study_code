@@ -69,8 +69,23 @@ done
 
 # ---- 前置检查 ----
 command -v docker >/dev/null || { err "未找到 docker 命令"; exit 1; }
-docker compose version >/dev/null 2>&1 \
-    || { err "需要 docker compose v2（不是 docker-compose v1）"; exit 1; }
+
+# docker compose v2 (plugin) 优先；回落到 docker-compose v1
+# v1 已 EOL（2023-07），但语法几乎一致，脚本仍兼容
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+    warn "检测到 docker-compose v1（已 EOL）。建议升级到 v2 插件："
+    warn "    sudo apt install docker-compose-plugin  # Ubuntu/Debian"
+    warn "    或参考 https://docs.docker.com/compose/install/linux/"
+else
+    err "未找到 docker compose。安装方式："
+    err "    推荐：sudo apt install docker-compose-plugin"
+    err "    兼容（v1）：sudo apt install docker-compose"
+    exit 1
+fi
+echo "    compose 命令：${COMPOSE[*]}"
 
 if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
     err "端口号无效：$PORT"
@@ -85,7 +100,7 @@ echo "    跳过构建：  $([ $NO_BUILD -eq 1 ] && echo 是 || echo 否)"
 
 # ---- 停旧容器 ----
 log "停止并移除旧容器"
-docker compose down --remove-orphans 2>&1 | sed 's/^/    /' || true
+"${COMPOSE[@]}" down --remove-orphans 2>&1 | sed 's/^/    /' || true
 
 # ---- 清旧镜像（仅本项目） ----
 log "清理旧的 cloudfile-backend 镜像"
@@ -115,7 +130,7 @@ fi
 # ---- 构建 ----
 if (( NO_BUILD == 0 )); then
     log "构建镜像（--no-cache，首次拉 vcpkg 依赖会比较久）"
-    HOST_PORT="$PORT" docker compose build --no-cache
+    HOST_PORT="$PORT" "${COMPOSE[@]}" build --no-cache
     ok "构建完成"
 else
     log "跳过构建（--no-build）"
@@ -123,7 +138,7 @@ fi
 
 # ---- 启动 ----
 log "启动 cloudfile（宿主机端口 $PORT → 容器端口 8080）"
-HOST_PORT="$PORT" docker compose up -d
+HOST_PORT="$PORT" "${COMPOSE[@]}" up -d
 
 # ---- 等 health check ----
 log "等待服务就绪（最长 ${HEALTH_TIMEOUT_SEC}s）"
@@ -137,12 +152,12 @@ while true; do
         curl -s "http://localhost:${PORT}/api/health" | sed 's/^/        /'
         echo
         echo "    访问地址：http://localhost:${PORT}"
-        echo "    跟踪日志：docker compose logs -f"
-        echo "    停止服务：docker compose down"
+        echo "    跟踪日志：${COMPOSE[*]} logs -f"
+        echo "    停止服务：${COMPOSE[*]} down"
 
         if (( FOLLOW_LOGS == 1 )); then
             log "跟踪日志（Ctrl-C 退出，服务继续运行）"
-            docker compose logs -f
+            "${COMPOSE[@]}" logs -f
         fi
         exit 0
     fi
@@ -151,7 +166,7 @@ while true; do
         printf "\n"
         err "health check 失败（${HEALTH_TIMEOUT_SEC}s 超时）"
         echo "    最近 60 行日志："
-        docker compose logs --tail=60 | sed 's/^/        /'
+        "${COMPOSE[@]}" logs --tail=60 | sed 's/^/        /'
         exit 1
     fi
 
