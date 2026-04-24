@@ -1,0 +1,19 @@
+{
+  "name": "cloudfile",
+  "version": "0.1.0",
+  "description": "Self-hosted AI-first cloud document system",
+  "dependencies": [
+    "drogon",
+    "sqlitecpp",
+    "libgit2",
+    "nlohmann-json",
+    "spdlog",
+    "fmt",
+    "libsodium",
+    {
+      "name": "gtest",
+      "features": []
+    }
+  ],
+  "builtin-baseline": "2026.03.15"
+}

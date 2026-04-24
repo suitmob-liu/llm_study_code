@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cloudfile-backend:local
+    container_name: cloudfile-backend
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    environment:
+      CLOUDFILE_HOST: "0.0.0.0"
+      CLOUDFILE_PORT: "8080"
+      CLOUDFILE_DATA_ROOT: "/var/lib/cloudfile"
+      CLOUDFILE_DEV: "${CLOUDFILE_DEV:-0}"
+      # Phase 1 会加上 CLOUDFILE_INITIAL_ADMIN_PASSWORD 等
+    volumes:
+      - cloudfile-data:/var/lib/cloudfile
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    # Phase 2 会加 MCP server 服务
+    # Phase 3 会加 nginx 反代 + certbot
+
+volumes:
+  cloudfile-data:
+    driver: local

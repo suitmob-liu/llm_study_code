@@ -1,0 +1,93 @@
+# Multi-stage build: builder → runtime
+# 参考架构决策 1.3（单进程 + threading.Lock）
+# 依赖通过 vcpkg manifest 拉取
+
+# ============================================================
+# Stage 1: Builder
+# ============================================================
+FROM ubuntu:24.04 AS builder
+
+ARG VCPKG_COMMIT=2026.03.15
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    ninja-build \
+    git \
+    curl \
+    zip \
+    unzip \
+    tar \
+    pkg-config \
+    ca-certificates \
+    autoconf \
+    autoconf-archive \
+    automake \
+    libtool \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 vcpkg
+RUN git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+    && cd /opt/vcpkg \
+    && git checkout ${VCPKG_COMMIT} \
+    && ./bootstrap-vcpkg.sh -disableMetrics
+
+ENV VCPKG_ROOT=/opt/vcpkg
+ENV PATH=$PATH:/opt/vcpkg
+
+WORKDIR /build
+COPY vcpkg.json ./
+COPY CMakeLists.txt ./
+COPY backend ./backend
+COPY mcp_server ./mcp_server
+COPY admin_cli ./admin_cli
+
+RUN cmake -B out -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
+    && cmake --build out --parallel
+
+# ============================================================
+# Stage 2: Runtime (minimal)
+# ============================================================
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    pandoc \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 非 root 用户运行
+RUN useradd -r -u 1000 -m -d /var/lib/cloudfile cloudfile
+
+COPY --from=builder /build/out/backend/cloudfile_backend        /usr/local/bin/
+COPY --from=builder /build/out/mcp_server/cloudfile_mcp          /usr/local/bin/
+COPY --from=builder /build/out/admin_cli/cloudfile_admin         /usr/local/bin/
+
+# 配置 git 提交身份（不配的话 git commit 会失败）
+ENV GIT_AUTHOR_NAME=cloudfile
+ENV GIT_AUTHOR_EMAIL=cloudfile@localhost
+ENV GIT_COMMITTER_NAME=cloudfile
+ENV GIT_COMMITTER_EMAIL=cloudfile@localhost
+
+# cloudfile 运行时配置
+ENV CLOUDFILE_HOST=0.0.0.0
+ENV CLOUDFILE_PORT=8080
+ENV CLOUDFILE_DATA_ROOT=/var/lib/cloudfile
+
+USER cloudfile
+WORKDIR /var/lib/cloudfile
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+    CMD curl -fsS http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/cloudfile_backend"]
