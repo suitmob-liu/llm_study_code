@@ -65,7 +65,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 非 root 用户运行
-RUN useradd -r -u 1000 -m -d /var/lib/cloudfile cloudfile
+# UID 1500 避开 Ubuntu 24.04 基础镜像预置的 ubuntu 用户 (UID 1000)。
+# 固定 UID 保证 volume 挂载 ownership 在重启后保持一致。
+RUN useradd -r -u 1500 -m -d /var/lib/cloudfile cloudfile
 
 COPY --from=builder /build/out/backend/cloudfile_backend        /usr/local/bin/
 COPY --from=builder /build/out/mcp_server/cloudfile_mcp          /usr/local/bin/
