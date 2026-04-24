@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Docker 宿主机默认端口 **8080 → 5494**。开发机上 8080 常被占（Tomcat、Jenkins、其他侧项目），5494 基本不冲突。容器内端口不变（仍为 8080）。可通过 `HOST_PORT` 环境变量或 `scripts/deploy.sh --port` 覆盖。
+- `Dockerfile` 启用 BuildKit syntax `# syntax=docker/dockerfile:1.6` 并在 `cmake` 步骤挂 cache mount 到 `/opt/vcpkg/downloads` 和 `/root/.cache/vcpkg`。**效果**：首次 build 还是要 20-40 分钟编译依赖；之后任何改 C++ 代码触发的 rebuild，vcpkg 直接从 cache mount 恢复，跳过下载和编译——几十秒到几分钟。需要 Docker 20.10+ 和 BuildKit（docker compose v2 默认启用）。
 
 ### Fixed
 

@@ -1,6 +1,11 @@
+# syntax=docker/dockerfile:1.6
 # Multi-stage build: builder → runtime
 # 参考架构决策 1.3（单进程 + threading.Lock）
 # 依赖通过 vcpkg manifest 拉取
+#
+# 需要 BuildKit（Docker 20.10+ 默认启用；docker compose v2 默认启用）。
+# BuildKit cache mount 用于缓存 vcpkg 的 source tarball 和 binary cache，
+# 让后续 rebuild 不用再花 20-40 分钟重装依赖。
 
 # ============================================================
 # Stage 1: Builder
@@ -49,7 +54,12 @@ COPY backend ./backend
 COPY mcp_server ./mcp_server
 COPY admin_cli ./admin_cli
 
-RUN cmake -B out -G Ninja \
+# 缓存 vcpkg 的 source tarball (/opt/vcpkg/downloads) 和 binary cache
+# (/root/.cache/vcpkg)。即使上面 COPY 层 cache 失效导致 RUN 重跑，vcpkg
+# 也会直接从 cache mount 恢复，不用重新下载+编译依赖。
+RUN --mount=type=cache,target=/opt/vcpkg/downloads,sharing=locked \
+    --mount=type=cache,target=/root/.cache/vcpkg,sharing=locked \
+    cmake -B out -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake \
     && cmake --build out --parallel
