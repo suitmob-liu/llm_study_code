@@ -1,22 +1,31 @@
 // cloudfile_admin: 管理员 CLI
 //
-// Phase 1a-1 已实现：
-//   cloudfile_admin init-admin [--username <u>] [--email <e>]
-//     从环境变量 CLOUDFILE_INITIAL_ADMIN_PASSWORD 或 stdin 读密码，
-//     创建第一个 is_admin=1 用户。幂等：已存在同用户名则报错退出。
+// Phase 1a-1 / 1a-2 已实现：
+//   init-admin [--username <u>] [--email <e>]
+//       创建第一个管理员账户（幂等）
+//   invite <email>
+//       生成一条 7 天有效期的邀请 token，打印一次
+//   list-users
+//       列出所有用户
+//   list-invites
+//       列出所有邀请（active / used / revoked / expired）
+//   revoke-invite <id>
+//       撤销邀请（幂等）
 //
-// Phase 1a-2 / 1b / 1c 将实现：invite、list-users、list-invites、
-// revoke-invite、delete-user、rebuild-index 等。
+// Phase 1b / 1c 将实现：delete-user、rebuild-index 等。
 
+#include "cloudfile/domain/invite.h"
 #include "cloudfile/domain/password.h"
 #include "cloudfile/domain/user.h"
 #include "cloudfile/storage/db.h"
 
+#include <fmt/core.h>
 #include <sodium.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -41,10 +50,19 @@ void print_usage() {
         "      或如果该变量未设，从 stdin 交互读取（echo off）。\n"
         "      默认 username=admin, email=admin@localhost。\n"
         "\n"
-        "  invite <email>             [Phase 1a-2]\n"
-        "  list-users                 [Phase 1a-2]\n"
-        "  list-invites               [Phase 1a-2]\n"
-        "  revoke-invite <id>         [Phase 1a-2]\n"
+        "  invite <email>\n"
+        "      为 email 生成一条 7 天邀请 token。token 仅打印一次，\n"
+        "      遗失只能 revoke-invite 后重新 invite。\n"
+        "      created_by 默认取第一个管理员。\n"
+        "\n"
+        "  list-users\n"
+        "      列出所有用户。\n"
+        "\n"
+        "  list-invites\n"
+        "      列出所有邀请（含状态：active / used / revoked / expired）。\n"
+        "\n"
+        "  revoke-invite <id>\n"
+        "      按 id 撤销邀请（id 从 list-invites 看）。幂等。\n"
         "\n"
         "Environment:\n"
         "  CLOUDFILE_DATA_ROOT              数据目录（默认 /var/lib/cloudfile）\n"
@@ -165,6 +183,115 @@ int cmd_init_admin(int argc, char** argv) {
     }
 }
 
+/// 找第一个 admin。invite/CLI 其他操作都把"谁发的"归到这个账户。
+/// 这样即使 admin 有多个（未来），CLI 不用挑——反正都是同机器上手动跑。
+std::optional<cloudfile::domain::user::User> find_first_admin() {
+    for (auto& u : cloudfile::domain::user::list_all()) {
+        if (u.is_admin) return u;
+    }
+    return std::nullopt;
+}
+
+int cmd_invite(int argc, char** argv) {
+    if (argc < 3 || std::string_view(argv[2]).substr(0, 2) == "--") {
+        spdlog::error("usage: cloudfile_admin invite <email>");
+        return 1;
+    }
+    const std::string email = argv[2];
+
+    auto admin = find_first_admin();
+    if (!admin) {
+        spdlog::error("no admin user found; run 'init-admin' first");
+        return 1;
+    }
+
+    try {
+        auto result = cloudfile::domain::invite::create(
+            admin->id,
+            std::optional<std::string_view>(email),
+            std::chrono::hours(24 * 7));
+
+        // 打印到 stdout，让 admin 复制
+        fmt::print("\n");
+        fmt::print("[ok] invite created for {} (expires {} UTC)\n",
+                   email, result.record.expires_at);
+        fmt::print("\n");
+        fmt::print("  token: {}\n", result.plaintext_token);
+        fmt::print("\n");
+        fmt::print("  share-link example:\n");
+        fmt::print("    https://your-host/register?token={}&email={}\n",
+                   result.plaintext_token, email);
+        fmt::print("\n");
+        fmt::print("  NOTE: token is shown ONCE. If lost, revoke-invite {} and re-invite.\n",
+                   result.record.id);
+        fmt::print("\n");
+        return 0;
+    } catch (const std::exception& e) {
+        spdlog::critical("create invite failed: {}", e.what());
+        return 1;
+    }
+}
+
+int cmd_list_users(int /*argc*/, char** /*argv*/) {
+    auto users = cloudfile::domain::user::list_all();
+    if (users.empty()) {
+        fmt::print("(no users)\n");
+        return 0;
+    }
+    fmt::print("{:>4}  {:<24}  {:<32}  {:<6}  {}\n",
+               "id", "username", "email", "role", "created_at");
+    fmt::print("{:-<90}\n", "");
+    for (const auto& u : users) {
+        fmt::print("{:>4}  {:<24}  {:<32}  {:<6}  {}\n",
+                   u.id, u.username, u.email,
+                   u.is_admin ? "admin" : "user",
+                   u.created_at);
+    }
+    return 0;
+}
+
+int cmd_list_invites(int /*argc*/, char** /*argv*/) {
+    auto invites = cloudfile::domain::invite::list_all();
+    if (invites.empty()) {
+        fmt::print("(no invites)\n");
+        return 0;
+    }
+    fmt::print("{:>4}  {:<30}  {:>10}  {:<8}  {:<20}  {}\n",
+               "id", "email_hint", "created_by", "status", "expires_at(UTC)", "created_at(UTC)");
+    fmt::print("{:-<100}\n", "");
+    for (const auto& inv : invites) {
+        auto st = cloudfile::domain::invite::status_of(inv);
+        fmt::print("{:>4}  {:<30}  {:>10}  {:<8}  {:<20}  {}\n",
+                   inv.id,
+                   inv.email_hint.value_or("-"),
+                   inv.created_by,
+                   cloudfile::domain::invite::status_name(st),
+                   inv.expires_at,
+                   inv.created_at);
+    }
+    return 0;
+}
+
+int cmd_revoke_invite(int argc, char** argv) {
+    if (argc < 3) {
+        spdlog::error("usage: cloudfile_admin revoke-invite <id>");
+        return 1;
+    }
+    std::int64_t id;
+    try {
+        id = std::stoll(argv[2]);
+    } catch (const std::exception&) {
+        spdlog::error("invalid invite id: {}", argv[2]);
+        return 1;
+    }
+    if (cloudfile::domain::invite::revoke_by_id(id)) {
+        spdlog::info("invite {} revoked", id);
+        return 0;
+    }
+    spdlog::error("invite {} not found", id);
+    return 1;
+}
+
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
@@ -203,14 +330,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (cmd == "init-admin") return cmd_init_admin(argc, argv);
-
-    // Phase 1a-2 命令
-    if (cmd == "invite" || cmd == "list-users" || cmd == "list-invites"
-            || cmd == "revoke-invite") {
-        spdlog::warn("'{}' 在 Phase 1a-2 实现（下一次 CC 对话）", cmd);
-        return 0;
-    }
+    if (cmd == "init-admin")    return cmd_init_admin(argc, argv);
+    if (cmd == "invite")        return cmd_invite(argc, argv);
+    if (cmd == "list-users")    return cmd_list_users(argc, argv);
+    if (cmd == "list-invites")  return cmd_list_invites(argc, argv);
+    if (cmd == "revoke-invite") return cmd_revoke_invite(argc, argv);
 
     spdlog::error("unknown command: {}", cmd);
     print_usage();

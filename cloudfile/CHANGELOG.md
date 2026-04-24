@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `storage/Database::init()` / `::instance()` 单例——backend 和 admin_cli 共用一套连接语义
   - `cloudfile_admin init-admin` CLI 命令：密码优先从环境变量 `CLOUDFILE_INITIAL_ADMIN_PASSWORD` 读，回落到 tty echo-off 交互输入。默认 username=admin / email=admin@localhost，可用 `--username` / `--email` 覆盖。幂等：同名 admin 已存在时静默成功；已有其他用户则拒绝
   - 静态库 `cloudfile_core`：把 domain/storage 抽成单独 library，backend 和 admin_cli 共享编译产物（不用编两遍 .cpp）
+- **Phase 1a-2a 邀请管理（CLI 侧）**：
+  - `domain/invite`：`invite_links` 表 CRUD。token 生成用 libsodium `randombytes_buf` 32 字节随机数，hex 编码成 64 字符；DB 里只存 BLAKE2b(token) hash，不存明文——DB 泄露不等于邀请码泄露。`create()` 一次性返回明文 token，丢了只能 revoke 重发。`mark_used()` 走单条原子 UPDATE + `WHERE status = active` 条件，避免 check-then-act 竞态；供 Phase 1a-2b 的 `/api/register` 调用。状态枚举 `Active / Used / Revoked / Expired` 按严重程度降序判定。
+  - CLI 4 个新命令：
+    - `invite <email>`：7 天有效期，`created_by` 自动取第一个管理员。token 打到 stdout，日志走 stderr——`admin ... | tee` 分开清晰
+    - `list-users`：id/username/email/role/created_at 表格
+    - `list-invites`：含计算出的 status 列
+    - `revoke-invite <id>`：幂等，已 revoked 的重复调也返回 0
+  - **尚未实现**：`/api/register` + `/api/login` + `/api/logout` + `/api/me` HTTP 接入（留给 Phase 1a-2b）。Session 表 schema 已就绪但 domain 层还没写。
 
 ### Changed
 

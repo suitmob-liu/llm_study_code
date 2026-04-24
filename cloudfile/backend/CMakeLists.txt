@@ -12,6 +12,7 @@ set(CLOUDFILE_CORE_SOURCES
     src/storage/db.cpp
     src/domain/password.cpp
     src/domain/user.cpp
+    src/domain/invite.cpp
 )
 
 add_library(cloudfile_core STATIC ${CLOUDFILE_CORE_SOURCES})
