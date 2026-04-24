@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Dockerfile` 的 `useradd -r -u 1000` 在 Ubuntu 24.04 基础镜像上冲突（24.04 从 Ubuntu 23.10 起预置了 UID 1000 的 `ubuntu` 用户）。改用 UID 1500 避开默认用户，保持固定 UID 以确保 volume ownership 跨重启一致。
 - `Dockerfile` 的 `VCPKG_COMMIT=2026.03.15` 和 `vcpkg.json` 的 `builtin-baseline: 2026.03.15` 是 Phase 0 commit 里的占位假值，vcpkg 对应的 tag/commit 不存在导致 `git checkout` 失败。修复：Dockerfile 改用 `VCPKG_REF=master`（shallow clone），`vcpkg.json` 移除 `builtin-baseline`（让 vcpkg 使用仓库 HEAD 作为默认 baseline）。未来需要复现性再通过 `--build-arg VCPKG_REF=<known-good-sha-or-tag>` 固定。
 - `backend/CMakeLists.txt` 里 libgit2 的 vcpkg target 名写错了。vcpkg master 的真实 target 是 `find_package(libgit2)` + `libgit2::libgit2package`，不是 Phase 0 commit 里猜的 `unofficial-git2` / `unofficial::git2::git2`。修复后 CMake configure 能过。
+- `backend/CMakeLists.txt` 无条件 `add_subdirectory(tests)` 在 Phase 0 阶段会失败（`tests/` 目录存在但没有 CMakeLists.txt）。改为只有 `tests/CMakeLists.txt` 实际存在时才 add_subdirectory——Phase 1 写测试时自动生效，不用再改这里。
 
 ### Not Yet Implemented (Phase 1+)
 

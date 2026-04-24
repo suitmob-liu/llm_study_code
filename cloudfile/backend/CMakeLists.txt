@@ -30,6 +30,8 @@ target_link_libraries(cloudfile_backend
         unofficial-sodium::sodium
 )
 
-if(BUILD_TESTING)
+# Phase 0 还没写测试。tests/ 目录里有 CMakeLists.txt 才会启用——
+# Phase 1 加测试时往 tests/CMakeLists.txt 里写东西就自动生效，不用改这里。
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     add_subdirectory(tests)
 endif()
