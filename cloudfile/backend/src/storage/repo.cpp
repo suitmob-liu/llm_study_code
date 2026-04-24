@@ -53,7 +53,7 @@ using Reference  = GitPtr<git_reference,  git_reference_free>;
 /// false 表示空仓库（第一个 commit 没有 parent）。
 bool load_head_parent(git_repository* repo, Commit& out) {
     Reference head;
-    int rc = git_repository_head(repo, head.out());
+    int rc = git_repository_head(head.out(), repo);
     if (rc == GIT_EUNBORNBRANCH || rc == GIT_ENOTFOUND) {
         return false;  // 空仓库
     }
