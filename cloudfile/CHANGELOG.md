@@ -43,13 +43,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `cloudfile_admin init-admin` CLI 命令：密码优先从环境变量 `CLOUDFILE_INITIAL_ADMIN_PASSWORD` 读，回落到 tty echo-off 交互输入。默认 username=admin / email=admin@localhost，可用 `--username` / `--email` 覆盖。幂等：同名 admin 已存在时静默成功；已有其他用户则拒绝
   - 静态库 `cloudfile_core`：把 domain/storage 抽成单独 library，backend 和 admin_cli 共享编译产物（不用编两遍 .cpp）
 - **Phase 1a-2a 邀请管理（CLI 侧）**：
-  - `domain/invite`：`invite_links` 表 CRUD。token 生成用 libsodium `randombytes_buf` 32 字节随机数，hex 编码成 64 字符；DB 里只存 BLAKE2b(token) hash，不存明文——DB 泄露不等于邀请码泄露。`create()` 一次性返回明文 token，丢了只能 revoke 重发。`mark_used()` 走单条原子 UPDATE + `WHERE status = active` 条件，避免 check-then-act 竞态；供 Phase 1a-2b 的 `/api/register` 调用。状态枚举 `Active / Used / Revoked / Expired` 按严重程度降序判定。
+  - `domain/invite`：`invite_links` 表 CRUD。token 生成用 libsodium `randombytes_buf` 32 字节随机数，hex 编码成 64 字符；DB 里只存 BLAKE2b(token) hash，不存明文——DB 泄露不等于邀请码泄露。`create()` 一次性返回明文 token，丢了只能 revoke 重发。`mark_used()` 走单条原子 UPDATE + `WHERE status = active` 条件，避免 check-then-act 竞态；供 `/api/register` 调用。状态枚举 `Active / Used / Revoked / Expired` 按严重程度降序判定。
   - CLI 4 个新命令：
     - `invite <email>`：7 天有效期，`created_by` 自动取第一个管理员。token 打到 stdout，日志走 stderr——`admin ... | tee` 分开清晰
     - `list-users`：id/username/email/role/created_at 表格
     - `list-invites`：含计算出的 status 列
     - `revoke-invite <id>`：幂等，已 revoked 的重复调也返回 0
-  - **尚未实现**：`/api/register` + `/api/login` + `/api/logout` + `/api/me` HTTP 接入（留给 Phase 1a-2b）。Session 表 schema 已就绪但 domain 层还没写。
+- **Phase 1a-2b 认证 HTTP API**：
+  - `domain/session`：`sessions` 表 CRUD。sessions.id 列存 BLAKE2b(token)，明文 token 只从 `create()` 返回一次（写进 Set-Cookie）。`find_active_and_touch()` SELECT + UPDATE `last_seen_at` 在同一把 write_mutex 下，避免 lookup-then-update 竞态；过期的 session 自动返回 nullopt（SQL `WHERE expires_at > datetime('now')`）。默认 session 有效期 30 天。
+  - `api/SessionAuthFilter`（Drogon filter）：读 `cfsession` cookie → 查 session → 把 user_id 塞进 `req->attributes()` → 放行；未认证/过期统一 401 JSON。
+  - `api/AuthController` 4 个端点：
+    - `POST /api/register`：body `{invite_token, username, email, password}`，校验 invite Active → 哈希密码 → 创建 user（`is_admin=false`）→ 原子消费 invite → 签发 session → Set-Cookie，返回 201 + user。409 冲突时回滚，410 Gone 表示 invite 非 Active 状态，400 表示字段缺失或格式错。
+    - `POST /api/login`：body `{login, password}`，`login` 可以是 username 或 email。密码错和用户不存在都返 401 `"invalid credentials"`（防用户枚举）。
+    - `POST /api/logout`：删 session + 清 cookie。幂等，无 cookie 也返 200。
+    - `GET /api/me`：走 SessionAuthFilter；返回当前 user。session 指向的 user 已被删时返 401 + 清 cookie。
+  - Cookie 属性：`HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`。`Secure` 属性由 `CLOUDFILE_COOKIE_SECURE=1` 环境变量控制，上 HTTPS 后打开（当前开发环境默认关闭，否则 localhost http 调试拿不到 cookie）。
+  - 密码哈希用 ~100-500ms Argon2id，带来登录/注册单机天花板；10 人规模远未到。
+  - `cloudfile_backend` 不需要改 main——Drogon 的 `HttpController` / `HttpFilter` 子类会通过全局构造函数自注册；`auth_controller.cpp` 和 `session_auth_filter.cpp` 在 `BACKEND_SOURCES` 里直接编进 exe（不经 static lib，避免 linker DCE）。
 
 ### Changed
 
@@ -69,7 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Not Yet Implemented (Phase 1+)
 
-- 认证（邀请链接 + session + Argon2id 密码哈希）
 - 文档 CRUD API + git commit 原子性保存
 - Wiki link 解析 + 反向链接索引
 - FTS5 全文搜索 API

@@ -13,6 +13,7 @@ set(CLOUDFILE_CORE_SOURCES
     src/domain/password.cpp
     src/domain/user.cpp
     src/domain/invite.cpp
+    src/domain/session.cpp
 )
 
 add_library(cloudfile_core STATIC ${CLOUDFILE_CORE_SOURCES})
@@ -34,6 +35,8 @@ target_link_libraries(cloudfile_core
 set(BACKEND_SOURCES
     src/main.cpp
     src/api/health_controller.cpp
+    src/api/auth_controller.cpp
+    src/api/session_auth_filter.cpp
 )
 
 add_executable(cloudfile_backend ${BACKEND_SOURCES})
