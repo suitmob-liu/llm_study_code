@@ -6,6 +6,11 @@
   "dependencies": [
     "drogon",
     "sqlitecpp",
+    {
+      "name": "sqlite3",
+      "features": ["fts5", "json1"],
+      "default-features": true
+    },
     "libgit2",
     "nlohmann-json",
     "spdlog",

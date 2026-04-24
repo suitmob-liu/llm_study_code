@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Dockerfile` 的 `VCPKG_COMMIT=2026.03.15` 和 `vcpkg.json` 的 `builtin-baseline: 2026.03.15` 是 Phase 0 commit 里的占位假值，vcpkg 对应的 tag/commit 不存在导致 `git checkout` 失败。修复：Dockerfile 改用 `VCPKG_REF=master`（shallow clone），`vcpkg.json` 移除 `builtin-baseline`（让 vcpkg 使用仓库 HEAD 作为默认 baseline）。未来需要复现性再通过 `--build-arg VCPKG_REF=<known-good-sha-or-tag>` 固定。
 - `backend/CMakeLists.txt` 里 libgit2 的 vcpkg target 名写错了。vcpkg master 的真实 target 是 `find_package(libgit2)` + `libgit2::libgit2package`，不是 Phase 0 commit 里猜的 `unofficial-git2` / `unofficial::git2::git2`。修复后 CMake configure 能过。
 - `backend/CMakeLists.txt` 无条件 `add_subdirectory(tests)` 在 Phase 0 阶段会失败（`tests/` 目录存在但没有 CMakeLists.txt）。改为只有 `tests/CMakeLists.txt` 实际存在时才 add_subdirectory——Phase 1 写测试时自动生效，不用再改这里。
+- vcpkg 默认装的 sqlite3 不带 FTS5 模块（`sqlite3[core,json1]`），backend 启动时跑 schema 迁移创建 `docs_fts` 虚表立即崩：`no such module: fts5`。修复：`vcpkg.json` 显式声明 sqlite3 依赖并启用 `fts5` 和 `json1` features，vcpkg 会用这组 features 重新编译 sqlite3 和下游 sqlitecpp。
 
 ### Not Yet Implemented (Phase 1+)
 
