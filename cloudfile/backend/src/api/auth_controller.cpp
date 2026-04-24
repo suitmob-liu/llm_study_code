@@ -1,5 +1,6 @@
 #include "cloudfile/api/auth_controller.h"
 
+#include "cloudfile/domain/doc.h"
 #include "cloudfile/domain/invite.h"
 #include "cloudfile/domain/password.h"
 #include "cloudfile/domain/session.h"
@@ -193,6 +194,10 @@ void AuthController::registerUser(
         spdlog::warn("mark_used failed after user create (user_id={}, invite_id={})",
                      u.id, inv->id);
     }
+
+    // 创建用户专属目录（docs_repo/<username>/）。空目录不 git commit——
+    // 用户写第一篇 md 时自然进 git。
+    cloudfile::domain::doc::ensure_user_dir(u.username);
 
     // 签发 session + cookie
     auto ua = req->getHeader("User-Agent");

@@ -32,11 +32,16 @@ target_link_libraries(cloudfile_core
 )
 
 # backend HTTP 服务
+# 注：storage/repo.cpp + domain/doc.cpp + api/doc_controller.cpp 放这里（不进 core）
+# 原因：repo.cpp 依赖 libgit2，admin_cli 不链 libgit2，把它们留在 exe 范围内。
 set(BACKEND_SOURCES
     src/main.cpp
+    src/storage/repo.cpp
+    src/domain/doc.cpp
     src/api/health_controller.cpp
     src/api/auth_controller.cpp
     src/api/session_auth_filter.cpp
+    src/api/doc_controller.cpp
 )
 
 add_executable(cloudfile_backend ${BACKEND_SOURCES})

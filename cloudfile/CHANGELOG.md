@@ -49,6 +49,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `list-users`：id/username/email/role/created_at 表格
     - `list-invites`：含计算出的 status 列
     - `revoke-invite <id>`：幂等，已 revoked 的重复调也返回 0
+- **Phase 1b-1 文档 CRUD + git commit 原子性**：
+  - `storage/Repo` 单例：libgit2 薄壳。`Repo::init()` 在 `<data_root>/repo` 下 `git init` 或 `open`，空仓库自动 bootstrap（写 `.gitignore` + initial commit）。默认作者从 `CLOUDFILE_GIT_NAME` / `CLOUDFILE_GIT_EMAIL` 环境变量读，回落 `cloudfile` / `cloudfile@localhost`。用户提交时作者改写为 `<username> <user.email>`——git log 能看到是谁改的。
+  - `commit_file(rel_path, content, ...)` / `commit_delete(rel_path, ...)`：写/删磁盘 + `git_index_add_bypath` / `git_index_remove_bypath` + `git_index_write_tree` + `git_commit_create`，整条链路走同一个 index，确保单次 commit 只含这一个文件的改动。RAII 包装 `git_repository` / `git_index` / `git_tree` / `git_commit` / `git_signature`，异常路径也不泄漏。
+  - `domain/doc`：
+    - `normalize()` 拒 `..` / 绝对路径 / 空段 / 控制字符 / 非 `.md` 后缀；统一 `\` → `/`。
+    - `check_access(user, path)` 硬编码规则：允许 `<username>/...` 和 `shared/...`，其他 403。admin 走 CLI 不走此 API。
+    - `list_for_user(user)` 扫 `docs_repo/<user>` + `docs_repo/shared`，按 `modified_at` 降序。≤10 人 × ≤1000 文档场景，FS walk 毫秒级。Phase 1b-1 不引入 `docs` 表——架构决策 1.1 说 FS + git 是唯一真相源，SQLite 是派生索引；list 走 FS 最直白，以后需要 LEFT JOIN FTS 再加。
+    - `write` / `remove` 在 `Database::write_mutex` 下串行（架构决策 1.3）。失败不回滚文件——commit 写不上时，下次写同文件会自然带上；或用 `rebuild-index` CLI 修复（Phase 1b-2 实现）。
+    - `ensure_user_dir(username)` 注册时调：`mkdir -p docs_repo/<username>`，幂等。空目录不 git commit，用户写第一篇文档时自然进 history。
+  - `api/DocController` 4 个端点（全挂 `SessionAuthFilter`）：
+    - `GET /api/docs` → `{docs: [{path, size_bytes, modified_at}...]}`，按 modified_at 降序
+    - `GET /api/docs/<path>` → `{path, content}`，404 不存在
+    - `PUT /api/docs/<path>` body `{content}` → 201 创建 / 200 更新
+    - `DELETE /api/docs/<path>` → 200 `{status:"deleted"}` / 404
+    - 通配路径用 `ADD_METHOD_VIA_REGEX("/api/docs/(.+)", ...)` 捕获剩余段；400 非法路径、403 越权、500 git 写失败
+  - `main.cpp` 启动时先开 DB 再开 Repo，关停时 `Repo::shutdown_global()` 释放 libgit2 全局状态。
+  - `AuthController::registerUser` 成功后调 `doc::ensure_user_dir(u.username)`——新用户登录即可往 `/api/docs/<username>/...` 写东西。
+
 - **Phase 1a-2b 认证 HTTP API**：
   - `domain/session`：`sessions` 表 CRUD。sessions.id 列存 BLAKE2b(token)，明文 token 只从 `create()` 返回一次（写进 Set-Cookie）。`find_active_and_touch()` SELECT + UPDATE `last_seen_at` 在同一把 write_mutex 下，避免 lookup-then-update 竞态；过期的 session 自动返回 nullopt（SQL `WHERE expires_at > datetime('now')`）。默认 session 有效期 30 天。
   - `api/SessionAuthFilter`（Drogon filter）：读 `cfsession` cookie → 查 session → 把 user_id 塞进 `req->attributes()` → 放行；未认证/过期统一 401 JSON。
@@ -79,7 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Not Yet Implemented (Phase 1+)
 
-- 文档 CRUD API + git commit 原子性保存
 - Wiki link 解析 + 反向链接索引
 - FTS5 全文搜索 API
 - MCP JSON-RPC 2.0 server（6 个工具：`list_docs` / `read_doc` / `write_doc` / `search_docs` / `backlinks_of` / `recent_edits`）

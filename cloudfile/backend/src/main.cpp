@@ -1,4 +1,5 @@
 #include "cloudfile/storage/db.h"
+#include "cloudfile/storage/repo.h"
 
 #include <drogon/drogon.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -17,6 +18,8 @@ struct Config {
     uint16_t    listen_port;
     std::filesystem::path data_root;    // docs_repo + db 所在目录
     std::filesystem::path config_file;  // drogon 配置 JSON
+    std::string           git_author_name;
+    std::string           git_author_email;
     bool        dev_mode;
 };
 
@@ -32,6 +35,8 @@ Config load_config() {
         std::stoi(env_or("CLOUDFILE_PORT", "8080")));
     c.data_root   = env_or("CLOUDFILE_DATA_ROOT", "/var/lib/cloudfile");
     c.config_file = env_or("CLOUDFILE_CONFIG", "/etc/cloudfile/cloudfile.conf");
+    c.git_author_name  = env_or("CLOUDFILE_GIT_NAME",  "cloudfile");
+    c.git_author_email = env_or("CLOUDFILE_GIT_EMAIL", "cloudfile@localhost");
     c.dev_mode    = std::string(env_or("CLOUDFILE_DEV", "0")) == "1";
     return c;
 }
@@ -74,6 +79,17 @@ int main() {
         return 1;
     }
 
+    // 打开/初始化 docs_repo（git 仓库），data_root/repo 下
+    try {
+        cloudfile::storage::Repo::init(
+            config.data_root / "repo",
+            config.git_author_name,
+            config.git_author_email);
+    } catch (const std::exception& e) {
+        spdlog::critical("docs_repo init failed: {}", e.what());
+        return 1;
+    }
+
     // Drogon HTTP 服务
     auto& app = drogon::app();
     app.addListener(config.listen_host, config.listen_port);
@@ -84,6 +100,7 @@ int main() {
     spdlog::info("listening on http://{}:{}", config.listen_host, config.listen_port);
     app.run();
 
+    cloudfile::storage::Repo::shutdown_global();
     spdlog::info("cloudfile backend shut down cleanly");
     return 0;
 }
