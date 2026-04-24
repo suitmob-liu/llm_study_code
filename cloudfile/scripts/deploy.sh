@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # cloudfile 一键 Docker 部署 / 重部署脚本
 #
-# 默认流程：停旧容器 → 清旧镜像 → no-cache 构建 → 启动 → 等 health check
+# 默认流程：停旧容器 → 复用 layer cache 增量构建 → 启动 → 等 health check
 # 默认保留数据 volume（文档不丢）。要彻底重置请加 --purge。
+# 遇到 cache 玄学问题（很少见）用 --clean 走干净重建。
 #
 # 用法：
-#   ./scripts/deploy.sh                  默认部署（端口 5494）
+#   ./scripts/deploy.sh                  默认快速部署（端口 5494，复用缓存）
 #   bash scripts/deploy.sh               如果脚本没可执行位
 #   scripts/deploy.sh --port 8080        指定端口
-#   scripts/deploy.sh --purge            清数据 volume 后部署（慎用！）
+#   scripts/deploy.sh --clean            清旧镜像 + --no-cache 重建（慢，兜底用）
+#   scripts/deploy.sh --purge            清数据 volume 后部署（慎用！会丢文档）
 #   scripts/deploy.sh --no-build         跳过构建直接重启（容器在就复用）
 #   scripts/deploy.sh --logs             部署完成后跟踪日志
 
@@ -29,6 +31,7 @@ cd "$ROOT"
 
 # 默认参数
 PORT="${HOST_PORT:-5494}"
+CLEAN=0
 PURGE=0
 NO_BUILD=0
 FOLLOW_LOGS=0
@@ -59,6 +62,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --port)      PORT="$2"; shift 2 ;;
+        --clean)     CLEAN=1; shift ;;
         --purge)     PURGE=1; shift ;;
         --no-build)  NO_BUILD=1; shift ;;
         --logs)      FOLLOW_LOGS=1; shift ;;
@@ -95,6 +99,7 @@ fi
 log "部署配置："
 echo "    宿主机端口：$PORT"
 echo "    项目根：    $ROOT"
+echo "    干净重建：  $([ $CLEAN -eq 1 ] && echo 是（--no-cache） || echo 否（复用 layer cache）)"
 echo "    清空数据：  $([ $PURGE -eq 1 ] && echo 是 || echo 否)"
 echo "    跳过构建：  $([ $NO_BUILD -eq 1 ] && echo 是 || echo 否)"
 
@@ -102,14 +107,18 @@ echo "    跳过构建：  $([ $NO_BUILD -eq 1 ] && echo 是 || echo 否)"
 log "停止并移除旧容器"
 "${COMPOSE[@]}" down --remove-orphans 2>&1 | sed 's/^/    /' || true
 
-# ---- 清旧镜像（仅本项目） ----
-log "清理旧的 cloudfile-backend 镜像"
-OLD_IMAGES=$(docker images -q cloudfile-backend 2>/dev/null || true)
-if [[ -n "$OLD_IMAGES" ]]; then
-    # shellcheck disable=SC2086
-    docker rmi -f $OLD_IMAGES 2>&1 | sed 's/^/    /' || true
-else
-    echo "    （没有旧镜像）"
+# ---- 清旧镜像（仅 --clean 模式） ----
+# 正常模式保留旧镜像，让 Docker layer cache 生效。
+# 旧镜像层不占新 build 的路径，只是多挂在磁盘上；Docker GC 自己管。
+if (( CLEAN == 1 )); then
+    log "清理旧的 cloudfile-backend 镜像（--clean）"
+    OLD_IMAGES=$(docker images -q cloudfile-backend 2>/dev/null || true)
+    if [[ -n "$OLD_IMAGES" ]]; then
+        # shellcheck disable=SC2086
+        docker rmi -f $OLD_IMAGES 2>&1 | sed 's/^/    /' || true
+    else
+        echo "    （没有旧镜像）"
+    fi
 fi
 
 # ---- 可选清 volume ----
@@ -128,9 +137,20 @@ if (( PURGE == 1 )); then
 fi
 
 # ---- 构建 ----
+# 默认复用 Docker layer cache + BuildKit cache mount（vcpkg downloads/编译产物跨 build 持久化）。
+# 改 src 只触发 cmake build 层重跑，vcpkg install 层命中 cache 秒过。
+# --clean 模式强制 --no-cache（+ 配合上面的 rmi），整套从头走。
+BUILD_ARGS=()
+if (( CLEAN == 1 )); then
+    BUILD_ARGS+=(--no-cache)
+    BUILD_MSG="构建镜像（--clean / --no-cache，预计 20-40 分钟）"
+else
+    BUILD_MSG="构建镜像（复用 cache，首次约 20-40 分钟，改代码后重跑几十秒~几分钟）"
+fi
+
 if (( NO_BUILD == 0 )); then
-    log "构建镜像（--no-cache，首次拉 vcpkg 依赖会比较久）"
-    HOST_PORT="$PORT" "${COMPOSE[@]}" build --no-cache
+    log "$BUILD_MSG"
+    HOST_PORT="$PORT" "${COMPOSE[@]}" build "${BUILD_ARGS[@]}"
     ok "构建完成"
 else
     log "跳过构建（--no-build）"
