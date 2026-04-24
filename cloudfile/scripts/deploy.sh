@@ -5,11 +5,22 @@
 # 默认保留数据 volume（文档不丢）。要彻底重置请加 --purge。
 #
 # 用法：
-#   scripts/deploy.sh                    默认部署（端口 5494）
+#   ./scripts/deploy.sh                  默认部署（端口 5494）
+#   bash scripts/deploy.sh               如果脚本没可执行位
 #   scripts/deploy.sh --port 8080        指定端口
 #   scripts/deploy.sh --purge            清数据 volume 后部署（慎用！）
 #   scripts/deploy.sh --no-build         跳过构建直接重启（容器在就复用）
 #   scripts/deploy.sh --logs             部署完成后跟踪日志
+
+# 若被 `sh script.sh` 调用（Dash/POSIX sh 不认 bashism），自动重启到 bash。
+# Ubuntu/Debian 的 /bin/sh 默认指向 Dash，不支持 pipefail / [[ ]] / 数组等。
+if [ -z "${BASH_VERSION:-}" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+    echo "ERROR: 此脚本需要 bash，请安装：apt install bash" >&2
+    exit 1
+fi
 
 set -euo pipefail
 
