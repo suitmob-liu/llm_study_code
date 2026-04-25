@@ -11,11 +11,14 @@
 //       列出所有邀请（active / used / revoked / expired）
 //   revoke-invite <id>
 //       撤销邀请（幂等）
+//   rebuild-index
+//       全量重建 docs_fts（FS+git 与 SQLite 派生索引 drift 时救命）
 //
-// Phase 1b / 1c 将实现：delete-user、rebuild-index 等。
+// Phase 1c 将实现：delete-user 等。
 
 #include "cloudfile/domain/invite.h"
 #include "cloudfile/domain/password.h"
+#include "cloudfile/domain/search.h"
 #include "cloudfile/domain/user.h"
 #include "cloudfile/storage/db.h"
 
@@ -63,6 +66,10 @@ void print_usage() {
         "\n"
         "  revoke-invite <id>\n"
         "      按 id 撤销邀请（id 从 list-invites 看）。幂等。\n"
+        "\n"
+        "  rebuild-index\n"
+        "      清空 docs_fts 后扫 docs_repo 全量重建。\n"
+        "      场景：发现搜索结果与文件实际内容不一致（drift）。\n"
         "\n"
         "Environment:\n"
         "  CLOUDFILE_DATA_ROOT              数据目录（默认 /var/lib/cloudfile）\n"
@@ -272,6 +279,23 @@ int cmd_list_invites(int /*argc*/, char** /*argv*/) {
     return 0;
 }
 
+int cmd_rebuild_index(int /*argc*/, char** /*argv*/, const std::filesystem::path& data_root) {
+    auto repo_root = data_root / "repo";
+    if (!std::filesystem::is_directory(repo_root)) {
+        spdlog::error("docs_repo not found at {}", repo_root.string());
+        spdlog::error("  hint: backend 启动过一次会自动 git init");
+        return 1;
+    }
+    try {
+        auto n = cloudfile::domain::search::rebuild_index_at(repo_root);
+        fmt::print("rebuilt FTS index: {} doc(s)\n", n);
+        return 0;
+    } catch (const std::exception& e) {
+        spdlog::critical("rebuild-index failed: {}", e.what());
+        return 1;
+    }
+}
+
 int cmd_revoke_invite(int argc, char** argv) {
     if (argc < 3) {
         spdlog::error("usage: cloudfile_admin revoke-invite <id>");
@@ -330,11 +354,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (cmd == "init-admin")    return cmd_init_admin(argc, argv);
-    if (cmd == "invite")        return cmd_invite(argc, argv);
-    if (cmd == "list-users")    return cmd_list_users(argc, argv);
-    if (cmd == "list-invites")  return cmd_list_invites(argc, argv);
-    if (cmd == "revoke-invite") return cmd_revoke_invite(argc, argv);
+    if (cmd == "init-admin")     return cmd_init_admin(argc, argv);
+    if (cmd == "invite")         return cmd_invite(argc, argv);
+    if (cmd == "list-users")     return cmd_list_users(argc, argv);
+    if (cmd == "list-invites")   return cmd_list_invites(argc, argv);
+    if (cmd == "revoke-invite")  return cmd_revoke_invite(argc, argv);
+    if (cmd == "rebuild-index")  return cmd_rebuild_index(argc, argv, data_root);
 
     spdlog::error("unknown command: {}", cmd);
     print_usage();

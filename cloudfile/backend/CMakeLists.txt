@@ -14,6 +14,7 @@ set(CLOUDFILE_CORE_SOURCES
     src/domain/user.cpp
     src/domain/invite.cpp
     src/domain/session.cpp
+    src/domain/search.cpp
 )
 
 add_library(cloudfile_core STATIC ${CLOUDFILE_CORE_SOURCES})
@@ -42,6 +43,7 @@ set(BACKEND_SOURCES
     src/api/auth_controller.cpp
     src/api/session_auth_filter.cpp
     src/api/doc_controller.cpp
+    src/api/search_controller.cpp
 )
 
 add_executable(cloudfile_backend ${BACKEND_SOURCES})

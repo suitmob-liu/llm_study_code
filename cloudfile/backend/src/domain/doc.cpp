@@ -1,5 +1,6 @@
 #include "cloudfile/domain/doc.h"
 
+#include "cloudfile/domain/search.h"
 #include "cloudfile/storage/db.h"
 #include "cloudfile/storage/repo.h"
 
@@ -176,7 +177,15 @@ void write(std::string_view normalized_path,
                                   author_username);
     repo.commit_file(normalized_path, content,
                      author_username, author_email, msg);
-    // Phase 1b-2 会在同一把锁下更新 docs_fts；1b-3 更新 wiki_links。
+
+    // FTS 索引随写更新（架构决策 1.1：SQLite 是派生索引，drift 时 rebuild-index）
+    try {
+        cloudfile::domain::search::index_upsert(normalized_path, content);
+    } catch (const std::exception& e) {
+        spdlog::warn("FTS index_upsert failed for {}: {} (run rebuild-index)",
+                     normalized_path, e.what());
+    }
+    // Phase 1b-3 会在同一把锁下更新 wiki_links。
 }
 
 bool remove(std::string_view normalized_path,
@@ -197,6 +206,12 @@ bool remove(std::string_view normalized_path,
         // 文件没在 index 里——理论上 exists 过了不应触发，但稳一点返回 false
         spdlog::warn("commit_delete failed for {}: {}", normalized_path, e.what());
         return false;
+    }
+    try {
+        cloudfile::domain::search::index_delete(normalized_path);
+    } catch (const std::exception& e) {
+        spdlog::warn("FTS index_delete failed for {}: {} (run rebuild-index)",
+                     normalized_path, e.what());
     }
     return true;
 }

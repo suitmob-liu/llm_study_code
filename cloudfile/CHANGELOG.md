@@ -49,6 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `list-users`：id/username/email/role/created_at 表格
     - `list-invites`：含计算出的 status 列
     - `revoke-invite <id>`：幂等，已 revoked 的重复调也返回 0
+- **Phase 1b-2 全文搜索 + FTS 索引维护**：
+  - `domain/search`：FTS5 操作。`index_upsert(path, content)` DELETE + INSERT（FTS5 没有原生 UPSERT），`index_delete(path)`，`search(q, username, limit)` 走 `docs_fts MATCH ?` + `path LIKE 'username/%'/'shared/%'` 过滤可见性。命中里塞 `snippet(docs_fts, 2, '<mark>', '</mark>', '…', 16)` 高亮片段，按 `bm25(docs_fts)` 升序排（rank 越小越相关）。
+  - 用户输入用 phrase 包装（`"<query>"`，内部 `"` 翻倍）——FTS5 `MATCH` 直接吃用户原文会被 `*` / `(` / `:` 等元字符炸；phrase 模式下所有非引号字符当字面量，配合 trigram tokenizer 自然支持中英文子串匹配。FTS5 syntax 错（理论上不应触发）log warn 返空数组，不 5xx。
+  - title 提取：扫文件第一个 `# heading` 行（`#` 后必须有空格才算 heading，markdown 规范），fallback basename without `.md`。
+  - `domain/doc::write` / `remove` 在 `Database::write_mutex` 同把锁下顺手调 `index_upsert` / `index_delete`——FTS 更新和 git commit 原子（架构决策 1.1）。FTS 写失败 log warn 不抛——FS+git 是真相源，drift 时 `rebuild-index` 救回。
+  - `api/SearchController` `GET /api/search?q=...&limit=N`（默认 20，上限 100）→ `{query, hits:[{path, title, snippet, rank}]}`。空 q → 400。挂 `SessionAuthFilter`，每个用户只看到自己 + shared/ 的命中。
+  - `cloudfile_admin rebuild-index` CLI：`scoped_lock(write_mutex)` 下 `DELETE FROM docs_fts` + 走 `recursive_directory_iterator` 扫 docs_repo（跳过 `.git/` 和 `.trash/`）+ 单条 transaction 批量 INSERT。重建场景：手动改了 docs_repo 文件、外部 git 同步、FTS 写失败积累 drift。
+  - `domain/search` 进 `cloudfile_core` 不依赖 libgit2，admin_cli 直接复用同套代码，保证 backend 写入和 CLI 重建走完全一致的 title 提取逻辑。
+
 - **Phase 1b-1 文档 CRUD + git commit 原子性**：
   - `storage/Repo` 单例：libgit2 薄壳。`Repo::init()` 在 `<data_root>/repo` 下 `git init` 或 `open`，空仓库自动 bootstrap（写 `.gitignore` + initial commit）。默认作者从 `CLOUDFILE_GIT_NAME` / `CLOUDFILE_GIT_EMAIL` 环境变量读，回落 `cloudfile` / `cloudfile@localhost`。用户提交时作者改写为 `<username> <user.email>`——git log 能看到是谁改的。
   - `commit_file(rel_path, content, ...)` / `commit_delete(rel_path, ...)`：写/删磁盘 + `git_index_add_bypath` / `git_index_remove_bypath` + `git_index_write_tree` + `git_commit_create`，整条链路走同一个 index，确保单次 commit 只含这一个文件的改动。RAII 包装 `git_repository` / `git_index` / `git_tree` / `git_commit` / `git_signature`，异常路径也不泄漏。
@@ -98,7 +107,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Not Yet Implemented (Phase 1+)
 
 - Wiki link 解析 + 反向链接索引
-- FTS5 全文搜索 API
 - MCP JSON-RPC 2.0 server（6 个工具：`list_docs` / `read_doc` / `write_doc` / `search_docs` / `backlinks_of` / `recent_edits`）
 - React + Milkdown 前端
 - Nginx 反代 + Let's Encrypt HTTPS
