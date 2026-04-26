@@ -49,6 +49,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `list-users`：id/username/email/role/created_at 表格
     - `list-invites`：含计算出的 status 列
     - `revoke-invite <id>`：幂等，已 revoked 的重复调也返回 0
+- **Phase 1b-3 wiki link 解析 + 反向链接**：
+  - `domain/wiki_link`：纯字符串扫 `[[target]]` 和 `[[target|alias]]`，跳过 ``` 围栏代码块（v1 不处理 inline `code`，写 wiki link 教学文档时再说，CHANGELOG 记一笔）。`inner` 含 `[` 视为非法（避免 `[[[a]]]` 之类），`|` 切 target/alias，前后 trim。
+  - 解析规则（`resolve(target, src_path, exists_fn)`）：
+    - target 含 `/` → 当 repo-relative，缺 `.md` 自动补
+    - 裸名先试 `<src_user>/<name>.md`，存在则用；否则 fallback `shared/<name>.md`
+    - 都不存在 → orphan，默认归 `<src_user>/` 目录（设计 D7：前端按红色虚线渲染）
+  - `extract_links`：parse + resolve + dedupe + 排除自引用（避免一篇文章只引用自己造成 backlink 自环）。
+  - `domain/doc::write` / `remove` 在 `Database::write_mutex` 同把锁下顺手调 `wiki_link::index_replace` / `index_delete_src`。删源文档时只清出边，入边保留——指向被删文档的链接成为 orphan，UI 渲染"已删除"（设计 D7）。`exists_fn` 闭包到 `doc::exists`，read-only FS stat，不竞写锁。
+  - `api/BacklinksController`：`GET /api/backlinks/{path}` 返回所有指向 path 的源文档列表。先 `check_access` 当前用户对 dst_path 的可读权限（避免越权探测他人目录结构），再用 `check_access` 过滤可见 src_path。挂 `SessionAuthFilter`，正则路由 `/api/backlinks/(.+)` 捕获剩余段。
+  - `cloudfile_admin rebuild-index` 扩展：先 FTS 全量重建，再 `wiki_link::rebuild_links_at` 全量重建出边。两次走 walk（先建 path 集再解析），≤1000 文档数量级毫秒级。整体在事务里。
+
 - **Phase 1b-2 全文搜索 + FTS 索引维护**：
   - `domain/search`：FTS5 操作。`index_upsert(path, content)` DELETE + INSERT（FTS5 没有原生 UPSERT），`index_delete(path)`，`search(q, username, limit)` 走 `docs_fts MATCH ?` + `path LIKE 'username/%'/'shared/%'` 过滤可见性。命中里塞 `snippet(docs_fts, 2, '<mark>', '</mark>', '…', 16)` 高亮片段，按 `bm25(docs_fts)` 升序排（rank 越小越相关）。
   - 用户输入用 phrase 包装（`"<query>"`，内部 `"` 翻倍）——FTS5 `MATCH` 直接吃用户原文会被 `*` / `(` / `:` 等元字符炸；phrase 模式下所有非引号字符当字面量，配合 trigram tokenizer 自然支持中英文子串匹配。FTS5 syntax 错（理论上不应触发）log warn 返空数组，不 5xx。
@@ -106,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Not Yet Implemented (Phase 1+)
 
-- Wiki link 解析 + 反向链接索引
+- Wiki link 重命名时同步重写所有引用（设计决策 1.6）
 - MCP JSON-RPC 2.0 server（6 个工具：`list_docs` / `read_doc` / `write_doc` / `search_docs` / `backlinks_of` / `recent_edits`）
 - React + Milkdown 前端
 - Nginx 反代 + Let's Encrypt HTTPS

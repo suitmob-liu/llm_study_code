@@ -20,6 +20,7 @@
 #include "cloudfile/domain/password.h"
 #include "cloudfile/domain/search.h"
 #include "cloudfile/domain/user.h"
+#include "cloudfile/domain/wiki_link.h"
 #include "cloudfile/storage/db.h"
 
 #include <fmt/core.h>
@@ -287,8 +288,10 @@ int cmd_rebuild_index(int /*argc*/, char** /*argv*/, const std::filesystem::path
         return 1;
     }
     try {
-        auto n = cloudfile::domain::search::rebuild_index_at(repo_root);
-        fmt::print("rebuilt FTS index: {} doc(s)\n", n);
+        auto fts_n  = cloudfile::domain::search::rebuild_index_at(repo_root);
+        auto link_n = cloudfile::domain::wiki_link::rebuild_links_at(repo_root);
+        fmt::print("rebuilt FTS index: {} doc(s)\n", fts_n);
+        fmt::print("rebuilt wiki_links: {} src doc(s)\n", link_n);
         return 0;
     } catch (const std::exception& e) {
         spdlog::critical("rebuild-index failed: {}", e.what());

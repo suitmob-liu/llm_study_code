@@ -1,6 +1,7 @@
 #include "cloudfile/domain/doc.h"
 
 #include "cloudfile/domain/search.h"
+#include "cloudfile/domain/wiki_link.h"
 #include "cloudfile/storage/db.h"
 #include "cloudfile/storage/repo.h"
 
@@ -185,7 +186,18 @@ void write(std::string_view normalized_path,
         spdlog::warn("FTS index_upsert failed for {}: {} (run rebuild-index)",
                      normalized_path, e.what());
     }
-    // Phase 1b-3 会在同一把锁下更新 wiki_links。
+
+    // wiki_links 索引随写更新（同把锁下）。exists_fn 闭包到 doc::exists——
+    // 仅 read-only FS stat，不竞写锁。
+    try {
+        auto links = cloudfile::domain::wiki_link::extract_links(
+            content, normalized_path,
+            [](std::string_view p) { return exists(p); });
+        cloudfile::domain::wiki_link::index_replace(normalized_path, links);
+    } catch (const std::exception& e) {
+        spdlog::warn("wiki_links update failed for {}: {} (run rebuild-index)",
+                     normalized_path, e.what());
+    }
 }
 
 bool remove(std::string_view normalized_path,
@@ -211,6 +223,14 @@ bool remove(std::string_view normalized_path,
         cloudfile::domain::search::index_delete(normalized_path);
     } catch (const std::exception& e) {
         spdlog::warn("FTS index_delete failed for {}: {} (run rebuild-index)",
+                     normalized_path, e.what());
+    }
+    // 删本文档为源的所有 wiki link 出边。指向本文档的入边保留——
+    // 它们成了 orphan，前端按设计 D7 渲染为"已删除"。
+    try {
+        cloudfile::domain::wiki_link::index_delete_src(normalized_path);
+    } catch (const std::exception& e) {
+        spdlog::warn("wiki_links delete_src failed for {}: {}",
                      normalized_path, e.what());
     }
     return true;
