@@ -5,6 +5,7 @@ import type { User } from './lib/types';
 import Login from './pages/Login';
 import DocList from './pages/DocList';
 import DocView from './pages/DocView';
+import Settings from './pages/Settings';
 import Layout from './components/Layout';
 
 type AuthState =
@@ -55,6 +56,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<DocList />} />
         <Route path="/d/*" element={<DocView />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

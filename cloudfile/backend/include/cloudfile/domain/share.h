@@ -48,6 +48,12 @@ std::vector<Token> list_for_doc(std::string_view doc_path);
 /// 列所有 share token（admin CLI）。
 std::vector<Token> list_all();
 
+/// 列某用户创建的 share token（用户自助 settings 用）。
+std::vector<Token> list_for_creator(std::int64_t user_id);
+
+/// 按 id 找；不存在返回 nullopt。用于 owner 校验后再 revoke。
+std::optional<Token> find_by_id(std::int64_t id);
+
 std::string hash_token(std::string_view plaintext);
 
 }  // namespace cloudfile::domain::share

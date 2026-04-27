@@ -19,6 +19,11 @@ public:
     ADD_METHOD_VIA_REGEX(ShareController::createShare,
                          "/api/docs/(.+)/share", drogon::Post,
                          "cloudfile::api::AuthFilter");
+    ADD_METHOD_TO(ShareController::listMine, "/api/me/shares", drogon::Get,
+                  "cloudfile::api::AuthFilter");
+    ADD_METHOD_VIA_REGEX(ShareController::revokeShare,
+                         "/api/shares/([0-9]+)", drogon::Delete,
+                         "cloudfile::api::AuthFilter");
     ADD_METHOD_VIA_REGEX(ShareController::publicView,
                          "/s/([0-9a-fA-F]+)", drogon::Get);
     METHOD_LIST_END
@@ -26,6 +31,13 @@ public:
     void createShare(const drogon::HttpRequestPtr& req,
                      std::function<void(const drogon::HttpResponsePtr&)>&& callback,
                      std::string path);
+
+    void listMine(const drogon::HttpRequestPtr& req,
+                  std::function<void(const drogon::HttpResponsePtr&)>&& callback);
+
+    void revokeShare(const drogon::HttpRequestPtr& req,
+                     std::function<void(const drogon::HttpResponsePtr&)>&& callback,
+                     std::string id_str);
 
     void publicView(const drogon::HttpRequestPtr& req,
                     std::function<void(const drogon::HttpResponsePtr&)>&& callback,

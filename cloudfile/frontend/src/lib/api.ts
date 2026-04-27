@@ -64,6 +64,15 @@ export const docs = {
     request<{ status: string }>('DELETE', `/api/docs/${encodePath(path)}`),
 };
 
+// ---- Search ----
+export const search_api = {
+  query: (q: string, limit = 20) =>
+    request<{
+      query: string;
+      hits: { path: string; title: string; snippet: string; rank: number }[];
+    }>('GET', `/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+};
+
 // ---- Backlinks ----
 export const backlinks = {
   of: (path: string) =>
@@ -73,6 +82,14 @@ export const backlinks = {
 };
 
 // ---- Share ----
+export interface ShareSummary {
+  id: number;
+  path: string;
+  status: 'active' | 'revoked';
+  created_at: string;
+  expires_at: string | null;
+}
+
 export const share = {
   create: (path: string, lifetime_days?: number) =>
     request<{
@@ -82,6 +99,29 @@ export const share = {
       'POST', `/api/docs/${encodePath(path)}/share`,
       lifetime_days !== undefined ? { lifetime_days } : {},
     ),
+  listMine: () => request<{ shares: ShareSummary[] }>('GET', '/api/me/shares'),
+  revoke: (id: number) =>
+    request<{ status: string }>('DELETE', `/api/shares/${id}`),
+};
+
+// ---- MCP tokens（自助管理）----
+export interface McpTokenSummary {
+  id: number;
+  name: string;
+  status: 'active' | 'revoked';
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export const mcp_tokens = {
+  listMine: () => request<{ tokens: McpTokenSummary[] }>('GET', '/api/me/mcp-tokens'),
+  create: (name: string) =>
+    request<{
+      id: number; name: string; token: string;
+      status: string; created_at: string;
+    }>('POST', '/api/me/mcp-tokens', { name }),
+  revoke: (id: number) =>
+    request<{ status: string }>('DELETE', `/api/mcp-tokens/${id}`),
 };
 
 export { HttpError };

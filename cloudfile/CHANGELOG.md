@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > Phase 2 收尾：搜索 / 设置页 / 体验打磨。Phase 3 公网 + HTTPS 通过 Caddy 反代承担。
 
+### Added
+
+- **Phase 2d-4 全局搜索 + 自助管理**：
+  - **后端自助 API**（无需走 admin CLI）：
+    - `GET /api/me/shares` 列当前用户创建的所有分享
+    - `DELETE /api/shares/{id}` 撤销，owner 校验失败返 403
+    - `GET /api/me/mcp-tokens` 列当前用户 token
+    - `POST /api/me/mcp-tokens` body `{name}`，返回明文一次（`{id, name, token, status, created_at}`）
+    - `DELETE /api/mcp-tokens/{id}` 撤销，owner 校验
+    - `domain/share` 加 `list_for_creator(user_id)` + `find_by_id`，`domain/mcp_token` 加 `find_by_id`
+    - 新建 `MCPTokenController`，路由全部挂 `AuthFilter`（cookie 或 bearer 都行——bearer 也能为自己签发更多 token，等价于带身份的 self-service）
+  - **前端全局搜索**（`SearchModal`）：
+    - 顶栏搜索按钮 + `⌘K` / `Ctrl+K` 全局快捷键（按平台显示），自动检测 mac/non-mac
+    - 输入 200ms debounce 调 `/api/search?q=...&limit=20`，前序请求用 `AbortController` 取消
+    - 命中列表显示 title + path + snippet（`<mark>` 高亮直接 `dangerouslySetInnerHTML` 渲染，外层 Tailwind `[&_mark]:bg-accent/20` 配色）
+    - 键盘导航：↑↓ 选 / Enter 跳 / Esc 关；遮罩点击关闭
+    - 中英文搜索都吃（trigram tokenizer）
+  - **前端设置页**（`/settings` 路由）：
+    - 顶栏齿轮图标入口
+    - 分享链接表格：路径 / 状态 / 创建时间 / 过期时间 / 撤销按钮。注：DB 只存 token hash，列表不展示 share_url——遗失的需 revoke 旧的 + 创建新的
+    - MCP token 表格：名字 / 状态 / 创建 / 最后使用 / 撤销。新建按钮就地展开输入框，创建后明文 token 仅本次显示，提示 `export CLOUDFILE_MCP_TOKEN=<token>`
+    - 撤销前 `window.confirm` 二次确认
+
 ---
 
 ## [0.2.0] - 2026-04-27

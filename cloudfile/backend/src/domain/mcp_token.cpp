@@ -125,6 +125,16 @@ std::vector<McpToken> list_all() {
     return out;
 }
 
+std::optional<McpToken> find_by_id(std::int64_t id) {
+    auto& db = storage::Database::instance();
+    SQLite::Statement q(db.raw(),
+        std::string("SELECT ") + kSelectCols +
+        " FROM mcp_tokens WHERE id = ?");
+    q.bind(1, id);
+    if (!q.executeStep()) return std::nullopt;
+    return row_to_token(q);
+}
+
 std::vector<McpToken> list_for_user(std::int64_t user_id) {
     auto& db = storage::Database::instance();
     std::vector<McpToken> out;

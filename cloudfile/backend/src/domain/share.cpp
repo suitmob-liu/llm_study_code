@@ -164,4 +164,25 @@ std::vector<Token> list_all() {
     return out;
 }
 
+std::vector<Token> list_for_creator(std::int64_t user_id) {
+    auto& db = storage::Database::instance();
+    std::vector<Token> out;
+    SQLite::Statement q(db.raw(),
+        std::string("SELECT ") + kSelectCols +
+        " FROM share_tokens WHERE created_by = ? ORDER BY id DESC");
+    q.bind(1, user_id);
+    while (q.executeStep()) out.push_back(row_to_token(q));
+    return out;
+}
+
+std::optional<Token> find_by_id(std::int64_t id) {
+    auto& db = storage::Database::instance();
+    SQLite::Statement q(db.raw(),
+        std::string("SELECT ") + kSelectCols +
+        " FROM share_tokens WHERE id = ?");
+    q.bind(1, id);
+    if (!q.executeStep()) return std::nullopt;
+    return row_to_token(q);
+}
+
 }  // namespace cloudfile::domain::share

@@ -41,6 +41,9 @@ std::vector<McpToken> list_all();
 /// 列某用户的 token。
 std::vector<McpToken> list_for_user(std::int64_t user_id);
 
+/// 按 id 找；不存在返回 nullopt。用于 owner 校验后再 revoke。
+std::optional<McpToken> find_by_id(std::int64_t id);
+
 /// 状态判定。
 enum class Status { Active, Revoked };
 Status status_of(const McpToken& t);

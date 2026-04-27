@@ -225,6 +225,61 @@ void ShareController::createShare(
     callback(json_response(drogon::k201Created, std::move(body)));
 }
 
+void ShareController::listMine(
+        const drogon::HttpRequestPtr& req,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+    auto u = current_user(req);
+    if (!u) {
+        callback(error_response(drogon::k401Unauthorized, "not authenticated"));
+        return;
+    }
+    auto tokens = cloudfile::domain::share::list_for_creator(u->id);
+    json arr = json::array();
+    // 注：DB 只存 token hash，明文 URL 在 create() 时仅返回一次。这里
+    // 列表只能展示元数据；要再分享只能 revoke 旧的、create 新的。
+    for (const auto& t : tokens) {
+        const char* status = "active";
+        if (t.revoked_at.has_value()) status = "revoked";
+        arr.push_back({
+            {"id",         t.id},
+            {"path",       t.doc_path},
+            {"status",     status},
+            {"created_at", t.created_at},
+            {"expires_at", t.expires_at.has_value() ? json(*t.expires_at) : json(nullptr)},
+        });
+    }
+    callback(json_response(drogon::k200OK, {{"shares", std::move(arr)}}));
+}
+
+void ShareController::revokeShare(
+        const drogon::HttpRequestPtr& req,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback,
+        std::string id_str) {
+    auto u = current_user(req);
+    if (!u) {
+        callback(error_response(drogon::k401Unauthorized, "not authenticated"));
+        return;
+    }
+    std::int64_t id;
+    try { id = std::stoll(id_str); }
+    catch (const std::exception&) {
+        callback(error_response(drogon::k400BadRequest, "invalid share id"));
+        return;
+    }
+    auto t = cloudfile::domain::share::find_by_id(id);
+    if (!t) {
+        callback(error_response(drogon::k404NotFound, "share not found"));
+        return;
+    }
+    // owner 校验：用户只能撤销自己创建的（admin 走 CLI）
+    if (t->created_by != u->id) {
+        callback(error_response(drogon::k403Forbidden, "not your share"));
+        return;
+    }
+    cloudfile::domain::share::revoke_by_id(id);   // 幂等
+    callback(json_response(drogon::k200OK, {{"status", "revoked"}}));
+}
+
 void ShareController::publicView(
         const drogon::HttpRequestPtr&,
         std::function<void(const drogon::HttpResponsePtr&)>&& callback,

@@ -49,6 +49,7 @@ set(BACKEND_SOURCES
     src/api/search_controller.cpp
     src/api/backlinks_controller.cpp
     src/api/share_controller.cpp
+    src/api/mcp_token_controller.cpp
 )
 
 add_executable(cloudfile_backend ${BACKEND_SOURCES})
