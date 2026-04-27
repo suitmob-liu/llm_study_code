@@ -88,6 +88,31 @@ public:
         return request("DELETE", path, std::string_view{});
     }
 
+    /// URL-escape a single string (e.g. query value). Caller frees nothing.
+    std::string escape(std::string_view s) {
+        char* esc = curl_easy_escape(curl_, s.data(), static_cast<int>(s.size()));
+        std::string out(esc ? esc : "");
+        if (esc) curl_free(esc);
+        return out;
+    }
+
+    /// URL-escape a path, preserving `/` separators.
+    /// `bob/中文 笔记.md` → `bob/%E4%B8%AD%E6%96%87%20%E7%AC%94%E8%AE%B0.md`
+    std::string escape_path(std::string_view path) {
+        std::string out;
+        std::size_t pos = 0;
+        while (pos <= path.size()) {
+            auto slash = path.find('/', pos);
+            std::string_view seg = (slash == std::string_view::npos)
+                ? path.substr(pos) : path.substr(pos, slash - pos);
+            out += escape(seg);
+            if (slash == std::string_view::npos) break;
+            out.push_back('/');
+            pos = slash + 1;
+        }
+        return out;
+    }
+
 private:
     Response request(const char* method,
                      std::string_view path,
@@ -148,6 +173,8 @@ json handle_initialize(const json& params) {
 
 json handle_tools_list() {
     json tools = json::array();
+
+    // 1. list_docs
     tools.push_back({
         {"name", "list_docs"},
         {"description",
@@ -161,6 +188,97 @@ json handle_tools_list() {
             {"additionalProperties", false},
         }},
     });
+
+    // 2. read_doc
+    tools.push_back({
+        {"name", "read_doc"},
+        {"description",
+            "Read a Markdown document by repo-relative path. "
+            "Path must end in `.md` and be under your user dir or `shared/`."},
+        {"inputSchema", {
+            {"type", "object"},
+            {"properties", {
+                {"path", {{"type", "string"},
+                          {"description", "e.g. 'alice/notes.md', 'shared/team.md'"}}},
+            }},
+            {"required", json::array({"path"})},
+            {"additionalProperties", false},
+        }},
+    });
+
+    // 3. write_doc
+    tools.push_back({
+        {"name", "write_doc"},
+        {"description",
+            "Create or update a Markdown document. Triggers a single-file git commit. "
+            "Returns 201 if newly created, 200 if updated. "
+            "Path must end in `.md`. `[[wiki-links]]` in content are parsed and indexed."},
+        {"inputSchema", {
+            {"type", "object"},
+            {"properties", {
+                {"path",    {{"type", "string"}}},
+                {"content", {{"type", "string"},
+                             {"description", "Full Markdown content (replaces existing)."}}},
+            }},
+            {"required", json::array({"path", "content"})},
+            {"additionalProperties", false},
+        }},
+    });
+
+    // 4. search_docs
+    tools.push_back({
+        {"name", "search_docs"},
+        {"description",
+            "Full-text search via SQLite FTS5 trigram tokenizer. Works for English and "
+            "Chinese (e.g. \"机器学习\" matches docs containing those characters). "
+            "Returns hits with `<mark>...</mark>` snippet highlights, ranked by bm25."},
+        {"inputSchema", {
+            {"type", "object"},
+            {"properties", {
+                {"query", {{"type", "string"}}},
+                {"limit", {{"type", "integer"},
+                           {"minimum", 1}, {"maximum", 100},
+                           {"description", "default 20"}}},
+            }},
+            {"required", json::array({"query"})},
+            {"additionalProperties", false},
+        }},
+    });
+
+    // 5. backlinks_of
+    tools.push_back({
+        {"name", "backlinks_of"},
+        {"description",
+            "List all documents linking to <path> via `[[wiki-link]]` syntax. "
+            "Useful for discovering 'what references this doc'."},
+        {"inputSchema", {
+            {"type", "object"},
+            {"properties", {
+                {"path", {{"type", "string"}}},
+            }},
+            {"required", json::array({"path"})},
+            {"additionalProperties", false},
+        }},
+    });
+
+    // 6. recent_edits
+    tools.push_back({
+        {"name", "recent_edits"},
+        {"description",
+            "List the N most recently modified documents (default 10). "
+            "Same shape as list_docs but truncated to top N."},
+        {"inputSchema", {
+            {"type", "object"},
+            {"properties", {
+                {"limit", {{"type", "integer"},
+                           {"minimum", 1}, {"maximum", 100},
+                           {"description", "default 10"}}},
+            }},
+            {"required", json::array()},
+            {"additionalProperties", false},
+        }},
+    });
+
     return {{"tools", std::move(tools)}};
 }
 
@@ -184,24 +302,90 @@ json wrap_http_result(const HttpClient::Response& r) {
     return result;
 }
 
-json handle_tools_call(const json& params, HttpClient& http) {
-    std::string name = params.value("name", "");
-    json args        = params.value("arguments", json::object());
-
-    if (name == "list_docs") {
-        auto r = http.get("/api/docs");
-        return wrap_http_result(r);
+/// 简易必填参数取值，缺失/类型错时抛 std::runtime_error。
+template <typename T>
+T require_arg(const json& args, const char* key) {
+    if (!args.contains(key)) {
+        throw std::runtime_error(std::string("missing argument: ") + key);
     }
+    try {
+        return args.at(key).get<T>();
+    } catch (const json::exception&) {
+        throw std::runtime_error(std::string("argument has wrong type: ") + key);
+    }
+}
 
+json tool_error(const std::string& msg) {
     return {
         {"isError", true},
         {"content", json::array({
-            {
-                {"type", "text"},
-                {"text", "unknown tool: " + name},
-            },
+            {{"type", "text"}, {"text", msg}},
         })},
     };
+}
+
+json handle_tools_call(const json& params, HttpClient& http) {
+    std::string name = params.value("name", "");
+    json args        = params.value("arguments", json::object());
+    if (!args.is_object()) args = json::object();
+
+    try {
+        if (name == "list_docs") {
+            return wrap_http_result(http.get("/api/docs"));
+        }
+
+        if (name == "read_doc") {
+            auto path = require_arg<std::string>(args, "path");
+            return wrap_http_result(
+                http.get("/api/docs/" + http.escape_path(path)));
+        }
+
+        if (name == "write_doc") {
+            auto path    = require_arg<std::string>(args, "path");
+            auto content = require_arg<std::string>(args, "content");
+            json body    = {{"content", content}};
+            return wrap_http_result(
+                http.put_json("/api/docs/" + http.escape_path(path), body.dump()));
+        }
+
+        if (name == "search_docs") {
+            auto query = require_arg<std::string>(args, "query");
+            int  limit = args.value("limit", 20);
+            std::string url = "/api/search?q=" + http.escape(query)
+                            + "&limit=" + std::to_string(limit);
+            return wrap_http_result(http.get(url));
+        }
+
+        if (name == "backlinks_of") {
+            auto path = require_arg<std::string>(args, "path");
+            return wrap_http_result(
+                http.get("/api/backlinks/" + http.escape_path(path)));
+        }
+
+        if (name == "recent_edits") {
+            int limit = args.value("limit", 10);
+            auto r = http.get("/api/docs");
+            if (r.status < 200 || r.status >= 300) return wrap_http_result(r);
+            try {
+                auto data  = json::parse(r.body);
+                auto& docs = data.at("docs");
+                if (docs.is_array() && static_cast<int>(docs.size()) > limit) {
+                    json truncated = json::array();
+                    for (int i = 0; i < limit; ++i) truncated.push_back(docs[i]);
+                    data["docs"] = std::move(truncated);
+                }
+                HttpClient::Response wrapped{r.status, data.dump()};
+                return wrap_http_result(wrapped);
+            } catch (const json::exception& e) {
+                return tool_error(std::string("recent_edits: failed to parse "
+                                              "backend response: ") + e.what());
+            }
+        }
+
+        return tool_error("unknown tool: " + name);
+    } catch (const std::exception& e) {
+        return tool_error(std::string("tool error: ") + e.what());
+    }
 }
 
 /// 构造 JSON-RPC 错误响应。

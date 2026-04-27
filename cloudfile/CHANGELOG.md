@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 2c MCP 工具补齐**（5 个工具）：
+  - `read_doc(path)` → `GET /api/docs/<path>`
+  - `write_doc(path, content)` → `PUT /api/docs/<path>` body `{content}`，触发单文件 git commit
+  - `search_docs(query, limit?)` → `GET /api/search?q=...&limit=...`，trigram 中英文都吃
+  - `backlinks_of(path)` → `GET /api/backlinks/<path>`
+  - `recent_edits(limit?)` → 调 `/api/docs` 然后客户端截前 N 条（list_for_user 已按 mtime desc，无需后端新增端点）
+  - 新增 `HttpClient::escape` / `escape_path`：用 `curl_easy_escape` URL 编码。`escape_path` 按 `/` 分段编码，保留路径分隔符——`bob/中文 笔记.md` 正确编为 `bob/%E4%B8%AD%E6%96%87%20%E7%AC%94%E8%AE%B0.md`，包含中文/空格/特殊字符的路径不会让 backend 收到坏 URL。
+  - `tools/call` 内部错（参数缺失、类型错、JSON 解析失败）走 `result.isError=true + content[0].text`，不上升到 JSON-RPC 层；后端非 2xx 同样 wrap 成 isError，给 LLM 看到 HTTP 状态码 + body。
+  - `require_arg<T>` 模板小工具：必填参数缺失/类型错时抛 std::runtime_error，外层统一捕获。
+
 - **Phase 2b MCP server 核心**（stdio JSON-RPC 2.0 + 1 个烟测工具）：
   - `mcp_server/src/main.cpp` 替换 Phase 0 stub。stdio 行式 JSON 主循环，spdlog 强制走 stderr（stdout 留给协议——协议 stream 里混 log 整个就废了）。
   - 必需协议方法 `initialize` / `tools/list` / `tools/call`，外加 `ping` 和 `notifications/initialized`/`notifications/cancelled` 静默 ack。`initialize` 响应里 `protocolVersion` 回客户端给的——MCP 这两年版本切得勤，回客户端版本对兼容性最稳。
