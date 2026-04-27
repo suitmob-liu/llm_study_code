@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> Phase 2 起步：MCP server（让 LLM 跨库读写搜索）+ React + Milkdown 前端。
+> Phase 2 收尾：搜索 / 设置页 / 体验打磨。Phase 3 公网 + HTTPS 通过 Caddy 反代承担。
+
+---
+
+## [0.2.0] - 2026-04-27
+
+> Phase 2 完成里程碑：MCP server（6 工具，stdio JSON-RPC）+ React + Milkdown 前端 + 公共分享链接 全部跑通。
+> 任意人凭 share URL 读文档，登录用户在 Web UI 写笔记、看 wiki 链接 + 反向链接，LLM 通过 cloudfile_mcp 跨库读写搜索。
 
 ### Added
 
@@ -211,5 +218,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 对比链接
 
-- [Unreleased...HEAD](https://github.com/suitmob-liu/llm_study_code/compare/v0.1.0...HEAD)
+- [Unreleased...HEAD](https://github.com/suitmob-liu/llm_study_code/compare/v0.2.0...HEAD)
+- [0.2.0](https://github.com/suitmob-liu/llm_study_code/compare/v0.1.0...v0.2.0)
 - [0.1.0](https://github.com/suitmob-liu/llm_study_code/compare/d1165ac...v0.1.0)
