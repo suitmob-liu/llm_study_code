@@ -15,7 +15,7 @@
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include <spdlog/sinks/stderr_color_sinks.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
