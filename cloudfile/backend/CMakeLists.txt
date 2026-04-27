@@ -16,6 +16,7 @@ set(CLOUDFILE_CORE_SOURCES
     src/domain/session.cpp
     src/domain/search.cpp
     src/domain/wiki_link.cpp
+    src/domain/mcp_token.cpp
 )
 
 add_library(cloudfile_core STATIC ${CLOUDFILE_CORE_SOURCES})
@@ -42,7 +43,7 @@ set(BACKEND_SOURCES
     src/domain/doc.cpp
     src/api/health_controller.cpp
     src/api/auth_controller.cpp
-    src/api/session_auth_filter.cpp
+    src/api/auth_filter.cpp
     src/api/doc_controller.cpp
     src/api/search_controller.cpp
     src/api/backlinks_controller.cpp

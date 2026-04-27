@@ -6,7 +6,7 @@ namespace cloudfile::api {
 
 /// 认证 API：register / login / logout / me
 ///
-/// 注：register/login/logout 不挂 filter；me 挂 SessionAuthFilter。
+/// 注：register/login/logout 不挂 filter；me 挂 AuthFilter。
 /// logout 需要读 cookie 但允许没有（idempotent 204 响应）。
 class AuthController : public drogon::HttpController<AuthController> {
 public:
@@ -15,7 +15,7 @@ public:
     ADD_METHOD_TO(AuthController::login,        "/api/login",    drogon::Post);
     ADD_METHOD_TO(AuthController::logout,       "/api/logout",   drogon::Post);
     ADD_METHOD_TO(AuthController::me,           "/api/me",       drogon::Get,
-                  "cloudfile::api::SessionAuthFilter");
+                  "cloudfile::api::AuthFilter");
     METHOD_LIST_END
 
     void registerUser(const drogon::HttpRequestPtr& req,

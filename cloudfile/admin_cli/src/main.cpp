@@ -13,10 +13,17 @@
 //       撤销邀请（幂等）
 //   rebuild-index
 //       全量重建 docs_fts（FS+git 与 SQLite 派生索引 drift 时救命）
+//   mcp-token create <username> <name>
+//       为 username 签发一条 MCP token，供 cloudfile_mcp 进程认证用
+//   mcp-token list
+//       列出所有 MCP token（含 active/revoked 状态）
+//   mcp-token revoke <id>
+//       撤销 token（id 从 list 看）。幂等。
 //
-// Phase 1c 将实现：delete-user 等。
+// Phase 2c+ 将实现：delete-user 等。
 
 #include "cloudfile/domain/invite.h"
+#include "cloudfile/domain/mcp_token.h"
 #include "cloudfile/domain/password.h"
 #include "cloudfile/domain/search.h"
 #include "cloudfile/domain/user.h"
@@ -71,6 +78,16 @@ void print_usage() {
         "  rebuild-index\n"
         "      清空 docs_fts 后扫 docs_repo 全量重建。\n"
         "      场景：发现搜索结果与文件实际内容不一致（drift）。\n"
+        "\n"
+        "  mcp-token create <username> <name>\n"
+        "      给 username 签一条长生命 token，给 cloudfile_mcp 进程认证用。\n"
+        "      明文 token 仅打印一次，遗失只能 revoke 重发。\n"
+        "\n"
+        "  mcp-token list\n"
+        "      列出所有 MCP token（id / user / name / status / 时间戳）。\n"
+        "\n"
+        "  mcp-token revoke <id>\n"
+        "      按 id 撤销 token。幂等。\n"
         "\n"
         "Environment:\n"
         "  CLOUDFILE_DATA_ROOT              数据目录（默认 /var/lib/cloudfile）\n"
@@ -299,6 +316,93 @@ int cmd_rebuild_index(int /*argc*/, char** /*argv*/, const std::filesystem::path
     }
 }
 
+int cmd_mcp_token(int argc, char** argv) {
+    if (argc < 3) {
+        spdlog::error("usage: cloudfile_admin mcp-token <create|list|revoke> ...");
+        return 1;
+    }
+    std::string_view sub = argv[2];
+
+    if (sub == "create") {
+        if (argc < 5) {
+            spdlog::error("usage: cloudfile_admin mcp-token create <username> <name>");
+            return 1;
+        }
+        std::string username = argv[3];
+        std::string name     = argv[4];
+
+        auto u = cloudfile::domain::user::find_by_username(username);
+        if (!u) {
+            spdlog::error("user not found: {}", username);
+            return 1;
+        }
+
+        try {
+            auto r = cloudfile::domain::mcp_token::create(u->id, name);
+            fmt::print("\n");
+            fmt::print("[ok] mcp token created (id={}, user={}, name={})\n",
+                       r.record.id, username, name);
+            fmt::print("\n");
+            fmt::print("  token: {}\n", r.plaintext_token);
+            fmt::print("\n");
+            fmt::print("  use it in cloudfile_mcp:\n");
+            fmt::print("    export CLOUDFILE_MCP_TOKEN={}\n", r.plaintext_token);
+            fmt::print("\n");
+            fmt::print("  NOTE: token is shown ONCE. If lost, mcp-token revoke {} and re-create.\n",
+                       r.record.id);
+            fmt::print("\n");
+            return 0;
+        } catch (const std::exception& e) {
+            spdlog::critical("mcp-token create failed: {}", e.what());
+            return 1;
+        }
+    }
+
+    if (sub == "list") {
+        auto tokens = cloudfile::domain::mcp_token::list_all();
+        if (tokens.empty()) {
+            fmt::print("(no mcp tokens)\n");
+            return 0;
+        }
+        fmt::print("{:>4}  {:>7}  {:<24}  {:<8}  {:<20}  {:<20}\n",
+                   "id", "user_id", "name", "status", "created_at(UTC)", "last_used_at(UTC)");
+        fmt::print("{:-<98}\n", "");
+        for (const auto& t : tokens) {
+            fmt::print("{:>4}  {:>7}  {:<24}  {:<8}  {:<20}  {:<20}\n",
+                       t.id, t.user_id, t.name,
+                       cloudfile::domain::mcp_token::status_name(
+                           cloudfile::domain::mcp_token::status_of(t)),
+                       t.created_at,
+                       t.last_used_at.value_or("-"));
+        }
+        return 0;
+    }
+
+    if (sub == "revoke") {
+        if (argc < 4) {
+            spdlog::error("usage: cloudfile_admin mcp-token revoke <id>");
+            return 1;
+        }
+        std::int64_t id;
+        try {
+            id = std::stoll(argv[3]);
+        } catch (const std::exception&) {
+            spdlog::error("invalid token id: {}", argv[3]);
+            return 1;
+        }
+        if (cloudfile::domain::mcp_token::revoke_by_id(id)) {
+            spdlog::info("mcp token {} revoked", id);
+            return 0;
+        }
+        // 幂等：已 revoked 或不存在都返回成功（与 revoke-invite 行为一致）
+        spdlog::warn("mcp token {} already revoked or not found", id);
+        return 0;
+    }
+
+    spdlog::error("unknown mcp-token subcommand: {}", sub);
+    return 1;
+}
+
 int cmd_revoke_invite(int argc, char** argv) {
     if (argc < 3) {
         spdlog::error("usage: cloudfile_admin revoke-invite <id>");
@@ -363,6 +467,7 @@ int main(int argc, char** argv) {
     if (cmd == "list-invites")   return cmd_list_invites(argc, argv);
     if (cmd == "revoke-invite")  return cmd_revoke_invite(argc, argv);
     if (cmd == "rebuild-index")  return cmd_rebuild_index(argc, argv, data_root);
+    if (cmd == "mcp-token")      return cmd_mcp_token(argc, argv);
 
     spdlog::error("unknown command: {}", cmd);
     print_usage();

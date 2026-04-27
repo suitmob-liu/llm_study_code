@@ -274,7 +274,7 @@ void AuthController::me(
     // Filter 已经在 attributes 里放了 user_id（不放行就走不到这里）
     auto attrs = req->attributes();
     if (!attrs->find("user_id")) {
-        spdlog::error("me: SessionAuthFilter didn't set user_id");
+        spdlog::error("me: AuthFilter didn't set user_id");
         callback(error_response(drogon::k500InternalServerError, "auth misconfigured"));
         return;
     }

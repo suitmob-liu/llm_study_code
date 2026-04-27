@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > Phase 2 起步：MCP server（让 LLM 跨库读写搜索）+ React + Milkdown 前端。
 
+### Added
+
+- **Phase 2a 后端 MCP token 认证**：
+  - `domain/mcp_token`：`create / verify / revoke_by_id / list_all / list_for_user`。token 是 32 字节随机 hex（64 chars），DB 存 BLAKE2b(plaintext)，明文从 `create()` 返回一次。`verify()` 命中后顺手 `UPDATE last_used_at = now`，便于审计哪个 token 在用。`mcp_tokens` 表在 schema v1 已经造好，本阶段只填代码。
+  - `api/AuthFilter`：取代 `SessionAuthFilter`。先看 `cfsession` cookie，未命中再读 `Authorization: Bearer <token>` 走 `mcp_token::verify`。两条路径都把 `user_id` 塞 `req->attributes()`，下游 controller 不感知差异——浏览器走 cookie，`cloudfile_mcp` 进程走 bearer。同一接口同一逻辑。`auth_controller.h` / `doc_controller.h` / `search_controller.h` / `backlinks_controller.h` 全部改名引用。
+  - `cloudfile_admin mcp-token` 三个子命令：
+    - `mcp-token create <username> <name>`：签发 token；明文打印一次；提示 `export CLOUDFILE_MCP_TOKEN=...` 给 MCP 进程
+    - `mcp-token list`：列出 id / user_id / name / status / created_at / last_used_at
+    - `mcp-token revoke <id>`：幂等设 `revoked_at`
+  - 设计：token 是长生命周期（不像 session 30 天就过期），靠 `revoked_at` 控制。这跟 MCP 客户端经常断开重连的使用模式匹配——LLM 客户端不会每次都重新认证。
+
+### Changed
+
+- `SessionAuthFilter` 改名 `AuthFilter`（行为扩展见 Added）。所有挂这个 filter 的端点对外行为不变：cookie 客户端无感，新增接受 bearer token。
+
 ---
 
 ## [0.1.0] - 2026-04-27
