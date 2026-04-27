@@ -65,7 +65,21 @@ RUN --mount=type=cache,target=/opt/vcpkg/downloads,sharing=locked \
     && cmake --build out --parallel
 
 # ============================================================
-# Stage 2: Runtime (minimal)
+# Stage 2: Frontend builder（独立于 C++ 编译，并行）
+# ============================================================
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json* ./
+# 没有 lockfile 也能跑（首次构建场景）；有就走 ci 严格按 lock 装
+RUN if [ -f package-lock.json ]; then npm ci; else npm install --no-audit; fi
+
+COPY frontend/ ./
+RUN npm run build
+
+# ============================================================
+# Stage 3: Runtime (minimal)
 # ============================================================
 FROM ubuntu:24.04 AS runtime
 
@@ -86,6 +100,9 @@ RUN useradd -r -u 1500 -m -d /var/lib/cloudfile cloudfile
 COPY --from=builder /build/out/backend/cloudfile_backend        /usr/local/bin/
 COPY --from=builder /build/out/mcp_server/cloudfile_mcp          /usr/local/bin/
 COPY --from=builder /build/out/admin_cli/cloudfile_admin         /usr/local/bin/
+
+# 前端构建产物：Drogon 启动时通过 setDocumentRoot 挂这个目录
+COPY --from=frontend-builder /frontend/dist  /usr/local/share/cloudfile/web
 
 # 配置 git 提交身份（不配的话 git commit 会失败）
 ENV GIT_AUTHOR_NAME=cloudfile

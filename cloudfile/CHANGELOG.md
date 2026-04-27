@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 2d-2 前端骨架**（Vite + React 18 + TS + Tailwind）：
+  - `frontend/` 工程：`package.json` / `tsconfig` / `vite.config.ts` / `tailwind.config.js` / `postcss.config.js` / `index.html`。Vite dev server 把 `/api` 和 `/s` 反代到 `CLOUDFILE_DEV_BACKEND`（默认 localhost:5494，便于本地走 SSH tunnel 调）。
+  - 视觉：按 DESIGN-SYSTEM Warm Scholar 暖琥珀方案，CSS 变量 + Tailwind `rgb(var(--bg) / <alpha-value>)` 模式，自动跟随 `prefers-color-scheme` 切深浅；字体栈 DM Sans / JetBrains Mono / Newsreader / Noto Sans SC fallback。
+  - `src/lib/api.ts`：fetch 包装器，`credentials:'include'` 自动带 cookie；`encodePath` 按 `/` 分段 `encodeURIComponent`，路径含中文/空格/特殊字符不挂；HttpError 类带 status，调用方按 401 跳登录。
+  - 3 页 MVP：
+    - `Login`：用户名/邮箱 + 密码表单，401 静默显示 `invalid credentials`，登录成功跳 `/`。
+    - `DocList`：`GET /api/docs`，按 mtime 倒序列出，loading 用 skeleton，空状态提示去 MCP/API 写。
+    - `DocView`：`GET /api/docs/:path`（path 从 `/d/*` 解出，含多段），react-markdown + remark-gfm 渲染表格/任务列表/删除线；右上角"分享"按钮调 `POST /api/docs/{path}/share`，返回 share_url 自动 `navigator.clipboard.writeText` 复制 + 屏内提示。
+  - `App.tsx` 启动时 `GET /api/me`：401 → `Login`；200 → `Layout`+ 已登录路由。`Layout` 顶栏含 logo / 用户名 / admin 标签 / 退出按钮。
+  - 后端 `main.cpp` 加 `setDocumentRoot(/usr/local/share/cloudfile/web)` + `setCustomErrorHandler`：404 时按路径前缀分流——`/api/` 和 `/s/` 返 JSON 404，其他路径返 `index.html` 让 React Router 接管 SPA 路由。
+  - `Dockerfile` 加 `node:20-slim AS frontend-builder` 阶段：`npm ci`（无 lockfile 时退化 `npm install`）+ `npm run build` 产 `dist/`，runtime 阶段 `COPY --from=frontend-builder` 到 `/usr/local/share/cloudfile/web`。和 C++ 阶段并行，整体 build time 不显著增加。
+
 - **Phase 2d-1 公共分享链接**：
   - schema v2 migration：`share_tokens(id, token_hash, doc_path, created_by, created_at, expires_at, revoked_at)`，`token_hash` 唯一，`doc_path` 索引；半部分活跃 token（`revoked_at IS NULL`）走 partial index 加速 verify。
   - `domain/share`：`create / verify / revoke_by_id / list_for_doc / list_all`。token 32 字节随机 hex（64 chars），DB 存 BLAKE2b。`lifetime_days = 0` 表示永不过期（`expires_at = NULL`）。`verify()` 走 `WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`，过期/撤销静默 404。

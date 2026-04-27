@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DESIGN-SYSTEM Warm Scholar：琥珀 + 卡其白
+   - 颜色 token 用 R G B triplet（Tailwind <alpha-value> 替换 alpha 通道）
+   - 自动跟随系统深浅色切换；可加 .light/.dark 类强制切换 */
+:root {
+  --bg:     255 251 245;   /* #FFFBF5 卡其白 */
+  --fg:      42  31  14;   /* 近黑偏暖 */
+  --muted:  118 103  90;   /* 二级文本 */
+  --accent: 217 119   6;   /* #D97706 琥珀主色 */
+  --border: 230 220 200;
+  --card:   249 244 234;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      23  18  11;   /* #17120B 暖近黑 */
+    --fg:     244 236 224;
+    --muted:  169 150 131;
+    --accent: 217 119   6;
+    --border:  56  45  32;
+    --card:    34  26  18;
+  }
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-bg text-fg font-sans antialiased; }
+
+/* 焦点环：用主色，不用浏览器默认蓝 */
+*:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.6);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
