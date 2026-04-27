@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> Phase 0 骨架阶段。所有变更待 Phase 1（认证 + 文档 CRUD）完成后合并进 `0.1.0`。
+> Phase 2 起步：MCP server（让 LLM 跨库读写搜索）+ React + Milkdown 前端。
+
+---
+
+## [0.1.0] - 2026-04-27
+
+> Phase 1 完成里程碑：认证 + 文档 CRUD + git 提交链路 + FTS 搜索 + wiki link/反向链接 全部跑通。
+> 自托管单机部署，≤10 人小团队可用。下一步进 Phase 2（MCP + 前端）。
 
 ### Added
 
@@ -115,13 +122,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `backend/CMakeLists.txt` 无条件 `add_subdirectory(tests)` 在 Phase 0 阶段会失败（`tests/` 目录存在但没有 CMakeLists.txt）。改为只有 `tests/CMakeLists.txt` 实际存在时才 add_subdirectory——Phase 1 写测试时自动生效，不用再改这里。
 - vcpkg 默认装的 sqlite3 不带 FTS5 模块（`sqlite3[core,json1]`），backend 启动时跑 schema 迁移创建 `docs_fts` 虚表立即崩：`no such module: fts5`。修复：`vcpkg.json` 显式声明 sqlite3 依赖并启用 `fts5` 和 `json1` features，vcpkg 会用这组 features 重新编译 sqlite3 和下游 sqlitecpp。
 
-### Not Yet Implemented (Phase 1+)
+### Deferred to Post-0.1.0
 
-- Wiki link 重命名时同步重写所有引用（设计决策 1.6）
-- MCP JSON-RPC 2.0 server（6 个工具：`list_docs` / `read_doc` / `write_doc` / `search_docs` / `backlinks_of` / `recent_edits`）
-- React + Milkdown 前端
-- Nginx 反代 + Let's Encrypt HTTPS
-- pandoc 集成（Excel/docx 导入导出，P2）
+- Wiki link 重命名时同步重写所有引用（设计决策 1.6，留到 Phase 2/3）
+- MCP JSON-RPC 2.0 server（6 个工具：`list_docs` / `read_doc` / `write_doc` / `search_docs` / `backlinks_of` / `recent_edits`）—— Phase 2
+- React + Milkdown 前端 —— Phase 2
+- Nginx 反代 + Let's Encrypt HTTPS —— Phase 3
+- pandoc 集成（Excel/docx 导入导出）—— P2
 
 ---
 
@@ -140,4 +147,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 对比链接
 
-- [Unreleased...HEAD](https://github.com/suitmob-liu/llm_study_code/compare/d1165ac...HEAD)
+- [Unreleased...HEAD](https://github.com/suitmob-liu/llm_study_code/compare/v0.1.0...HEAD)
+- [0.1.0](https://github.com/suitmob-liu/llm_study_code/compare/d1165ac...v0.1.0)
