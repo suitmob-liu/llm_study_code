@@ -17,6 +17,7 @@ set(CLOUDFILE_CORE_SOURCES
     src/domain/search.cpp
     src/domain/wiki_link.cpp
     src/domain/mcp_token.cpp
+    src/domain/share.cpp
 )
 
 add_library(cloudfile_core STATIC ${CLOUDFILE_CORE_SOURCES})
@@ -47,6 +48,7 @@ set(BACKEND_SOURCES
     src/api/doc_controller.cpp
     src/api/search_controller.cpp
     src/api/backlinks_controller.cpp
+    src/api/share_controller.cpp
 )
 
 add_executable(cloudfile_backend ${BACKEND_SOURCES})

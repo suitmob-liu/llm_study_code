@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 2d-1 公共分享链接**：
+  - schema v2 migration：`share_tokens(id, token_hash, doc_path, created_by, created_at, expires_at, revoked_at)`，`token_hash` 唯一，`doc_path` 索引；半部分活跃 token（`revoked_at IS NULL`）走 partial index 加速 verify。
+  - `domain/share`：`create / verify / revoke_by_id / list_for_doc / list_all`。token 32 字节随机 hex（64 chars），DB 存 BLAKE2b。`lifetime_days = 0` 表示永不过期（`expires_at = NULL`）。`verify()` 走 `WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`，过期/撤销静默 404。
+  - `api/ShareController`：
+    - `POST /api/docs/{path}/share`（挂 AuthFilter）→ body `{lifetime_days?: int}`，0 或缺省 = 永不过期。返回 `{id, path, token, share_url, expires_at}`。`share_url` 优先取 `CLOUDFILE_PUBLIC_BASE_URL` 环境变量，否则反推 `Host` header（开发环境 OK，上 HTTPS 必须显式设）。
+    - `GET /s/{token}`（**不挂 filter**，正则 `[0-9a-fA-F]+` 限制 token 形态）→ 返回 HTML 渲染页：marked.js@12.0.2 CDN 客户端渲染（无需后端 Markdown 库），DESIGN-SYSTEM 暖琥珀配色 + 自适应深浅色。Markdown 内容用 `nlohmann::json::dump()` 转成 JS 字符串字面量塞进 `<script>`，自动 escape `</script>` 等 sentinel 防 XSS。CDN fail 自动降级 `<pre>` 兜底。token 无效或目标 doc 已删都返同一个 404 HTML（不暴露内部细节）。
+  - `cloudfile_admin shares list / revoke`：列表打印 active/revoked/expired 三态，CLI 端按当前 UTC 时间字符串比对 expires_at 计算 expired 标签。
+  - 安全权衡：share_url 是 64 字符随机，无外部枚举；只读、不能修改；可随时 `shares revoke` 立即失效。MVP 暂不限频，未来 Phase 3 上 nginx limit_req 兜一手。
+
 - **Phase 2c MCP 工具补齐**（5 个工具）：
   - `read_doc(path)` → `GET /api/docs/<path>`
   - `write_doc(path, content)` → `PUT /api/docs/<path>` body `{content}`，触发单文件 git commit

@@ -79,6 +79,24 @@ constexpr const char* kMigrations[] = {
             version INTEGER PRIMARY KEY
         );
     )SQL",
+
+    // v2: 公共分享 token（任何人凭 URL 读取一篇 md，无需登录）
+    R"SQL(
+        CREATE TABLE IF NOT EXISTS share_tokens (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash   TEXT NOT NULL UNIQUE,
+            doc_path     TEXT NOT NULL,
+            created_by   INTEGER NOT NULL REFERENCES users(id),
+            created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            expires_at   TEXT,                -- NULL = 永不过期
+            revoked_at   TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_share_tokens_doc ON share_tokens(doc_path);
+        CREATE INDEX IF NOT EXISTS idx_share_tokens_active
+            ON share_tokens(token_hash)
+            WHERE revoked_at IS NULL;
+    )SQL",
 };
 
 constexpr int kLatestVersion = sizeof(kMigrations) / sizeof(kMigrations[0]);

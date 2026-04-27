@@ -13,6 +13,11 @@
 //       撤销邀请（幂等）
 //   rebuild-index
 //       全量重建 docs_fts（FS+git 与 SQLite 派生索引 drift 时救命）
+//   shares list
+//       列出所有公共分享 token（含 status：active / revoked / expired）
+//   shares revoke <id>
+//       撤销分享（id 从 list 看）。幂等。
+//
 //   mcp-token create <username> <name>
 //       为 username 签发一条 MCP token，供 cloudfile_mcp 进程认证用
 //   mcp-token list
@@ -26,6 +31,7 @@
 #include "cloudfile/domain/mcp_token.h"
 #include "cloudfile/domain/password.h"
 #include "cloudfile/domain/search.h"
+#include "cloudfile/domain/share.h"
 #include "cloudfile/domain/user.h"
 #include "cloudfile/domain/wiki_link.h"
 #include "cloudfile/storage/db.h"
@@ -38,6 +44,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstdlib>
+#include <ctime>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -78,6 +85,12 @@ void print_usage() {
         "  rebuild-index\n"
         "      清空 docs_fts 后扫 docs_repo 全量重建。\n"
         "      场景：发现搜索结果与文件实际内容不一致（drift）。\n"
+        "\n"
+        "  shares list\n"
+        "      列出所有公共分享 token。任何人凭 token URL 可读对应文档。\n"
+        "\n"
+        "  shares revoke <id>\n"
+        "      按 id 撤销分享。幂等。\n"
         "\n"
         "  mcp-token create <username> <name>\n"
         "      给 username 签一条长生命 token，给 cloudfile_mcp 进程认证用。\n"
@@ -316,6 +329,71 @@ int cmd_rebuild_index(int /*argc*/, char** /*argv*/, const std::filesystem::path
     }
 }
 
+int cmd_shares(int argc, char** argv) {
+    if (argc < 3) {
+        spdlog::error("usage: cloudfile_admin shares <list|revoke> ...");
+        return 1;
+    }
+    std::string_view sub = argv[2];
+
+    if (sub == "list") {
+        auto tokens = cloudfile::domain::share::list_all();
+        if (tokens.empty()) {
+            fmt::print("(no shares)\n");
+            return 0;
+        }
+        fmt::print("{:>4}  {:<32}  {:<8}  {:<20}  {:<20}\n",
+                   "id", "doc_path", "status", "created_at(UTC)", "expires_at(UTC)");
+        fmt::print("{:-<92}\n", "");
+        for (const auto& t : tokens) {
+            // status：先看 revoked，再看 expires_at vs now（list 时 expired 标出来）
+            const char* status_str = "active";
+            if (t.revoked_at.has_value()) {
+                status_str = "revoked";
+            } else if (t.expires_at.has_value()) {
+                // SQL CURRENT_TIMESTAMP 也是 UTC，这里直接字符串比较即可
+                std::time_t now = std::time(nullptr);
+                std::tm tm{};
+#ifdef _WIN32
+                gmtime_s(&tm, &now);
+#else
+                gmtime_r(&now, &tm);
+#endif
+                char nowbuf[24];
+                std::strftime(nowbuf, sizeof(nowbuf), "%Y-%m-%d %H:%M:%S", &tm);
+                if (*t.expires_at < nowbuf) status_str = "expired";
+            }
+            fmt::print("{:>4}  {:<32}  {:<8}  {:<20}  {:<20}\n",
+                       t.id, t.doc_path, status_str, t.created_at,
+                       t.expires_at.value_or("-"));
+        }
+        return 0;
+    }
+
+    if (sub == "revoke") {
+        if (argc < 4) {
+            spdlog::error("usage: cloudfile_admin shares revoke <id>");
+            return 1;
+        }
+        std::int64_t id;
+        try {
+            id = std::stoll(argv[3]);
+        } catch (const std::exception&) {
+            spdlog::error("invalid share id: {}", argv[3]);
+            return 1;
+        }
+        if (cloudfile::domain::share::revoke_by_id(id)) {
+            spdlog::info("share {} revoked", id);
+            return 0;
+        }
+        spdlog::warn("share {} already revoked or not found", id);
+        return 0;
+    }
+
+    spdlog::error("unknown shares subcommand: {}", sub);
+    return 1;
+}
+
 int cmd_mcp_token(int argc, char** argv) {
     if (argc < 3) {
         spdlog::error("usage: cloudfile_admin mcp-token <create|list|revoke> ...");
@@ -468,6 +546,7 @@ int main(int argc, char** argv) {
     if (cmd == "revoke-invite")  return cmd_revoke_invite(argc, argv);
     if (cmd == "rebuild-index")  return cmd_rebuild_index(argc, argv, data_root);
     if (cmd == "mcp-token")      return cmd_mcp_token(argc, argv);
+    if (cmd == "shares")         return cmd_shares(argc, argv);
 
     spdlog::error("unknown command: {}", cmd);
     print_usage();
