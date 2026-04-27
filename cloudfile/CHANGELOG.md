@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 2b MCP server 核心**（stdio JSON-RPC 2.0 + 1 个烟测工具）：
+  - `mcp_server/src/main.cpp` 替换 Phase 0 stub。stdio 行式 JSON 主循环，spdlog 强制走 stderr（stdout 留给协议——协议 stream 里混 log 整个就废了）。
+  - 必需协议方法 `initialize` / `tools/list` / `tools/call`，外加 `ping` 和 `notifications/initialized`/`notifications/cancelled` 静默 ack。`initialize` 响应里 `protocolVersion` 回客户端给的——MCP 这两年版本切得勤，回客户端版本对兼容性最稳。
+  - 错误码遵循 JSON-RPC 2.0：`-32700` parse error / `-32601` method not found / `-32603` internal error。tools/call 工具内部错则走 `result.isError = true` + content text，不上升到 JSON-RPC 层（这是 MCP spec 的约定）。
+  - libcurl HttpClient：单 `CURL*` 复用，每请求 reset。`Authorization: Bearer $CLOUDFILE_MCP_TOKEN` 自动带；30s 超时；body 走 `CURLOPT_POSTFIELDS` + 自定义 `CURLOPT_CUSTOMREQUEST` 支持 PUT/DELETE。
+  - 配置：`CLOUDFILE_MCP_TOKEN`（必填）+ `CLOUDFILE_BACKEND_URL`（默认 `http://127.0.0.1:8080`，容器内访问 backend）。token 缺失直接 `exit(1)` 让用户立刻发现。
+  - 1 个烟测工具 `list_docs`：调 `GET /api/docs`，把响应 body 原样塞进 `content[0].text`。Phase 2c 补齐其余 5 个工具。
+  - vcpkg 加 `curl[ssl]` 依赖；`mcp_server/CMakeLists.txt` link `CURL::libcurl`。
+
 - **Phase 2a 后端 MCP token 认证**：
   - `domain/mcp_token`：`create / verify / revoke_by_id / list_all / list_for_user`。token 是 32 字节随机 hex（64 chars），DB 存 BLAKE2b(plaintext)，明文从 `create()` 返回一次。`verify()` 命中后顺手 `UPDATE last_used_at = now`，便于审计哪个 token 在用。`mcp_tokens` 表在 schema v1 已经造好，本阶段只填代码。
   - `api/AuthFilter`：取代 `SessionAuthFilter`。先看 `cfsession` cookie，未命中再读 `Authorization: Bearer <token>` 走 `mcp_token::verify`。两条路径都把 `user_id` 塞 `req->attributes()`，下游 controller 不感知差异——浏览器走 cookie，`cloudfile_mcp` 进程走 bearer。同一接口同一逻辑。`auth_controller.h` / `doc_controller.h` / `search_controller.h` / `backlinks_controller.h` 全部改名引用。

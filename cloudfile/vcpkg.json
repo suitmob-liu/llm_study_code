@@ -17,6 +17,10 @@
     "fmt",
     "libsodium",
     {
+      "name": "curl",
+      "features": ["ssl"]
+    },
+    {
       "name": "gtest",
       "features": []
     }
