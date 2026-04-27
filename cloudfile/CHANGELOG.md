@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Phase 2d-3 编辑器 + wiki link + 反向链接 + 新建文档**：
+  - **Milkdown Crepe 编辑器**（@milkdown/crepe）：Notion 风 WYSIWYG，slash 菜单 / 代码块 / 表格 / 任务列表全都自带。React 包装走命令式生命周期——mount 时 `new Crepe + create()`，unmount `destroy()`；不做 controlled 模式（避免 setValue 重建文档树丢光标）。`onChange` 通过 ref 持有最新闭包，父组件 rerender 不会重建编辑器。
+  - **DocView 改造为读/写双模**：tab 切换 阅读/编辑，`?edit=1` 查询参数可直接进编辑模式（新建文档跳转后用）；编辑态 `dirty` 跟踪未保存改动，`beforeunload` 提示防误关；保存按钮调 `PUT /api/docs/<path>`，触发 git commit + FTS 更新 + wiki_links 重建（架构决策 1.3）。保存成功后递增 `refreshKey` 触发 BacklinksPanel 重查，及时反映新写入的 `[[link]]`。
+  - **wiki link 客户端解析**（`src/lib/wikilinks.ts`）：阅读模式下把 `[[target]]` / `[[target|alias]]` 用正则替换为 `[alias-or-target](/d/resolved)`，再喂 react-markdown。解析规则镜像后端：含 `/` 当 repo-relative，裸名归 `<src_user>/`。点链接走 React Router 内部跳转，不刷新页面，保持上下文。
+    - 已知限制：客户端不做 FS exists 检查，所以不会 fallback shared/——裸名 `[[team]]` 总解析成 `<src_user>/team.md`，实际在 shared/ 的得显式写 `[[shared/team]]`。code fence 内的 `[[...]]` 也会被吃，写 wiki link 教学文档时再修。
+  - **反向链接面板**（`BacklinksPanel`）：DocView 底部可折叠，调 `GET /api/backlinks/<path>`，列出引用此文档的所有源文档点击跳转。`refreshKey` 让保存后立即重查。
+  - **新建文档对话框**（`NewDocDialog`）：DocList 顶部 `+ 新建` 按钮触发；输入路径默认前缀 `<username>/`，自动补 `.md`；先 `GET` 试探防止覆盖（已存在则直接打开），不存在则 `PUT` 写一行 `# basename` 模板，跳转 `/d/<path>?edit=1`。ESC 关闭，遮罩点击关闭。
+  - 后端不动——所有功能都基于 Phase 1b/2d-1 已有的 doc CRUD / backlinks / share API。
+
 - **Phase 2d-2 前端骨架**（Vite + React 18 + TS + Tailwind）：
   - `frontend/` 工程：`package.json` / `tsconfig` / `vite.config.ts` / `tailwind.config.js` / `postcss.config.js` / `index.html`。Vite dev server 把 `/api` 和 `/s` 反代到 `CLOUDFILE_DEV_BACKEND`（默认 localhost:5494，便于本地走 SSH tunnel 调）。
   - 视觉：按 DESIGN-SYSTEM Warm Scholar 暖琥珀方案，CSS 变量 + Tailwind `rgb(var(--bg) / <alpha-value>)` 模式，自动跟随 `prefers-color-scheme` 切深浅；字体栈 DM Sans / JetBrains Mono / Newsreader / Noto Sans SC fallback。

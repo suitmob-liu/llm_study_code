@@ -64,6 +64,14 @@ export const docs = {
     request<{ status: string }>('DELETE', `/api/docs/${encodePath(path)}`),
 };
 
+// ---- Backlinks ----
+export const backlinks = {
+  of: (path: string) =>
+    request<{ path: string; backlinks: string[] }>(
+      'GET', `/api/backlinks/${encodePath(path)}`,
+    ),
+};
+
 // ---- Share ----
 export const share = {
   create: (path: string, lifetime_days?: number) =>

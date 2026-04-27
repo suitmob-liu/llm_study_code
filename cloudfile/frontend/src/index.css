@@ -36,3 +36,27 @@ body { @apply bg-bg text-fg font-sans antialiased; }
   outline-offset: 2px;
   border-radius: 3px;
 }
+
+/* Milkdown Crepe 编辑器外壳：让它跟着我们的暖琥珀色 */
+.crepe-host {
+  border: 1px solid rgb(var(--border));
+  border-radius: 8px;
+  min-height: 24rem;
+  overflow: hidden;
+  background: rgb(var(--bg));
+}
+.crepe-host .ProseMirror {
+  padding: 1rem 1.25rem;
+  min-height: 22rem;
+  font-family: inherit;
+  color: rgb(var(--fg));
+  background: rgb(var(--bg));
+}
+/* Crepe 自带的链接颜色用我们的主色 */
+.crepe-host a { color: rgb(var(--accent)); }
+.crepe-host code {
+  background: rgb(var(--card));
+  color: rgb(var(--accent));
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
