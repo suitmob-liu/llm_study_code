@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# 运行时状态（本地运行或 GOLD_HOME 下生成，Docker 中位于数据卷）
+data/
+models/
+reports/
+history/
+config.json
+
+# 本地部署配置
+.env

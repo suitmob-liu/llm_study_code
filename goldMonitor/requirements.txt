@@ -1,6 +1,7 @@
-requests>=2.28
-pandas>=2.0
-numpy>=1.24
+requests>=2.28,<3
+# pandas 3.x 有不兼容改动（默认字符串类型、Copy-on-Write），代码基于 2.x 测试
+pandas>=2.0,<3
+numpy>=1.24,<3
 tzdata
 fastapi>=0.110
 uvicorn>=0.27

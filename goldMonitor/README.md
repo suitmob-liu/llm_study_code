@@ -39,10 +39,11 @@ bash deploy.sh              # 等价于 docker compose up -d --build
 docker compose logs -f                                   # 查看日志
 docker compose exec gold python main.py history          # 在容器内使用命令行
 docker compose exec gold python main.py train            # 手动重训
-docker run --rm -v claude_g_gold_data:/data -v $PWD:/backup busybox tar czf /backup/gold_backup.tgz -C /data .   # 备份
+docker run --rm -v goldmonitor_gold_data:/data -v $PWD:/backup busybox tar czf /backup/gold_backup.tgz -C /data .   # 备份
 ```
 
 > 卷的实际名称是 `<目录名>_gold_data`，可以用 `docker volume ls` 查看。
+> **构建时 pip 下载超时**：在 `.env` 中把 `PIP_INDEX_URL` 换成离服务器最近的镜像（`.env.example` 里列了腾讯云、阿里云的公网和内网地址，云服务器优先用同厂商的内网镜像），然后重新执行 `bash deploy.sh`。构建启用了 pip 缓存，已下载完的包不会重复下载。
 > 如果服务器无法直连 Yahoo Finance，请在 `.env` 中配置 `HTTPS_PROXY`；如果网页对公网开放，建议设置 `ADMIN_TOKEN`，防止他人修改情景或触发训练。
 
 本地不用 Docker 时，直接运行 `pip install -r requirements.txt && python main.py serve` 即可。
