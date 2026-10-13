@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "cloudfile",
+  "version": "0.1.0",
+  "description": "Self-hosted AI-first cloud document system",
+  "dependencies": [
+    "drogon",
+    "sqlitecpp",
+    {
+      "name": "sqlite3",
+      "features": ["fts5", "json1"],
+      "default-features": true
+    },
+    "libgit2",
+    "nlohmann-json",
+    "spdlog",
+    "fmt",
+    "libsodium",
+    {
+      "name": "curl",
+      "features": ["ssl"]
+    },
+    {
+      "name": "gtest",
+      "features": []
+    }
+  ]
+}

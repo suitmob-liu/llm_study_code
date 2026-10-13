@@ -1,0 +1,41 @@
+# Build
+/build/
+/out/
+/backend/out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# vcpkg
+/vcpkg_installed/
+/.vcpkg/
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+
+# Runtime data (absolutely do not commit)
+/docs_repo/
+/attachments/
+/data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Secrets
+.env
+.env.local
+/config/*.local.conf
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Logs
+*.log
+/log/
