@@ -1,0 +1,6 @@
+requests>=2.28
+pandas>=2.0
+numpy>=1.24
+tzdata
+fastapi>=0.110
+uvicorn>=0.27

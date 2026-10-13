@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>黄金走势分析</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 22h20l-3-9H9z' fill='%23c9971c'/><path d='M11 13h10l-2-6h-6z' fill='%23e3b341'/></svg>">
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/vendor/echarts.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo"></span>黄金走势分析</div>
+  <nav class="tabs" role="tablist">
+    <button data-tab="overview" class="active">总览</button>
+    <button data-tab="trend">走势</button>
+    <button data-tab="query">历史查询</button>
+    <button data-tab="forecast">预测与回测</button>
+    <button data-tab="context">国际情景</button>
+    <button data-tab="system">系统</button>
+  </nav>
+  <div class="top-right">
+    <span id="live" class="live" title="行情状态"><i></i><span>连接中</span></span>
+    <button id="themeBtn" class="icon-btn" title="切换深浅色">◐</button>
+  </div>
+</header>
+
+<main>
+  <!-- 总览 -->
+  <section id="tab-overview" class="tab active">
+    <div class="hero card">
+      <div class="hero-main">
+        <div class="muted small">COMEX 黄金期货 · 美元/盎司</div>
+        <div class="hero-price" id="heroPrice">—</div>
+        <div class="hero-change" id="heroChange"></div>
+        <div class="hero-sub" id="heroSub"></div>
+      </div>
+      <div class="hero-spark" id="spark"></div>
+    </div>
+    <div class="tiles" id="macroTiles"></div>
+
+    <div class="section-head">
+      <h2>最新预测</h2>
+      <span class="muted small" id="predMeta"></span>
+    </div>
+    <div class="pred-cards" id="predCards"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>近 5 日走势与预测</h3>
+        <span class="muted small">蓝线为实际价格；橙点为预测价及 80% 区间，空心表示待验证，实心表示已验证</span>
+      </div>
+      <div class="chart" id="overviewChart" style="height:360px"></div>
+    </div>
+  </section>
+
+  <!-- 走势 -->
+  <section id="tab-trend" class="tab">
+    <div class="toolbar card">
+      <div class="seg" id="rangeSeg">
+        <button data-v="1d">1日</button><button data-v="5d">5日</button><button data-v="1m">1月</button>
+        <button data-v="3m">3月</button><button data-v="6m">6月</button><button data-v="1y" class="active">1年</button>
+        <button data-v="2y">2年</button>
+      </div>
+      <div class="seg" id="typeSeg"><button data-v="line" class="active">折线</button><button data-v="candle">K线</button></div>
+      <div class="seg" id="unitSeg"><button data-v="usd" class="active">美元/盎司</button><button data-v="cny">人民币/克</button></div>
+      <label class="field">对比
+        <select id="overlaySel">
+          <option value="">无</option><option value="dxy">美元指数</option><option value="tnx">10年美债收益率</option>
+          <option value="silver">白银</option><option value="oil">WTI原油</option><option value="vix">VIX</option>
+        </select>
+      </label>
+      <label class="field">自定义 <input type="date" id="cStart"> ~ <input type="date" id="cEnd"></label>
+      <button class="btn" id="cGo">应用</button>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 id="trendTitle">黄金走势</h3><span class="muted small" id="trendNote"></span></div>
+      <div class="chart" id="trendChart" style="height:460px"></div>
+    </div>
+
+    <div class="section-head"><h2>近一年复盘</h2><span class="muted small" id="anaMeta"></span></div>
+    <div class="tiles" id="anaTiles"></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><h3>月度涨跌</h3></div>
+        <div class="chart" id="monthChart" style="height:300px"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>与国际因子的日度相关性（近一年）</h3></div>
+        <table class="tbl" id="corrTable"></table>
+        <p class="muted small">相关系数取值 -1 ~ +1。与美元、美债收益率负相关越强，说明利率和汇率逻辑越主导金价。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 历史查询 -->
+  <section id="tab-query" class="tab">
+    <div class="toolbar card">
+      <div class="seg" id="kindSeg">
+        <button data-v="day" class="active">按日</button><button data-v="week">按周</button><button data-v="month">按月</button>
+      </div>
+      <label class="field">日期 <input type="date" id="qDate"></label>
+      <label class="field hidden" id="qMonthWrap">月份 <input type="month" id="qMonth"></label>
+      <button class="btn primary" id="qGo">查询</button>
+      <button class="btn" id="qPrev">‹ 上一个</button>
+      <button class="btn" id="qNext">下一个 ›</button>
+      <span class="muted small">按北京时间统计；周为周一至周日</span>
+    </div>
+
+    <div id="qResult"></div>
+
+    <div class="section-head">
+      <h2>近一年列表</h2>
+      <div class="seg small" id="listSeg">
+        <button data-v="day">每日</button><button data-v="week">每周</button><button data-v="month" class="active">每月</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="chart" id="listChart" style="height:260px"></div>
+      <div class="table-wrap"><table class="tbl clickable" id="listTable"></table></div>
+    </div>
+  </section>
+
+  <!-- 预测与回测 -->
+  <section id="tab-forecast" class="tab">
+    <div class="toolbar card">
+      <button class="btn primary" data-action="predict">立即预测</button>
+      <button class="btn" data-action="evaluate">回测到期预测</button>
+      <button class="btn" data-action="train">重新训练模型</button>
+      <span class="muted small" id="fcMsg"></span>
+    </div>
+    <div class="section-head"><h2>累计预测表现</h2><span class="muted small" id="fcModel"></span></div>
+    <div class="table-wrap card"><table class="tbl" id="accTable"></table></div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>预测价 vs 实际价</h3>
+        <div class="seg small" id="fcHSeg"><button data-v="5h" class="active">5小时</button><button data-v="1d">1天</button><button data-v="7d">7天</button></div>
+      </div>
+      <div class="chart" id="fcChart" style="height:340px"></div>
+    </div>
+
+    <div class="section-head"><h2>预测记录</h2>
+      <div class="seg small" id="fcStatusSeg"><button data-v="" class="active">全部</button><button data-v="evaluated">已验证</button><button data-v="pending">待验证</button></div>
+    </div>
+    <div class="card table-wrap"><table class="tbl" id="predTable"></table></div>
+
+    <div class="section-head"><h2>模型变更历史</h2></div>
+    <div id="histList"></div>
+  </section>
+
+  <!-- 国际情景 -->
+  <section id="tab-context" class="tab">
+    <div class="card">
+      <div class="card-head">
+        <h3>国际基本面情景打分</h3>
+        <span class="muted small" id="ctxMeta"></span>
+      </div>
+      <p id="ctxSummary" class="ctx-summary"></p>
+      <div class="score-bar"><div class="score-axis"><span>极度利空 -1</span><span>0</span><span>+1 极度利多</span></div><div class="score-track"><i id="scoreDot"></i></div></div>
+      <div id="ctxFactors" class="factors"></div>
+      <div class="row-actions">
+        <button class="btn" id="ctxAdd">+ 添加因子</button>
+        <button class="btn primary" id="ctxSave">保存情景</button>
+        <span class="muted small" id="ctxMsg"></span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="card-head"><h3>近期关注事件</h3></div><ul id="ctxEvents" class="plain"></ul></div>
+      <div class="card"><div class="card-head"><h3>信息来源</h3></div><ul id="ctxSources" class="plain links"></ul></div>
+    </div>
+  </section>
+
+  <!-- 系统 -->
+  <section id="tab-system" class="tab">
+    <div class="grid2">
+      <div class="card"><div class="card-head"><h3>运行状态</h3><button class="btn" data-action="refresh">立即刷新行情</button></div><table class="tbl" id="sysTable"></table></div>
+      <div class="card"><div class="card-head"><h3>最近事件</h3></div><ul id="sysEvents" class="plain events"></ul></div>
+    </div>
+    <div class="card"><div class="card-head"><h3>数据存储</h3></div><div class="table-wrap"><table class="tbl" id="dataTable"></table></div></div>
+    <div class="card" id="tokenCard">
+      <div class="card-head"><h3>管理口令</h3></div>
+      <p class="muted small">如果服务端设置了 ADMIN_TOKEN，执行预测、训练、修改情景等写操作前需要在这里填写口令（只保存在本浏览器中）。</p>
+      <input type="password" id="tokenInput" placeholder="ADMIN_TOKEN"> <button class="btn" id="tokenSave">保存</button>
+    </div>
+  </section>
+</main>
+
+<footer class="muted small">数据来源 Yahoo Finance（COMEX 黄金期货 GC=F 等），人民币价格按美元兑人民币汇率折算，未含国内溢价。模型输出仅供研究参考，不构成投资建议。</footer>
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

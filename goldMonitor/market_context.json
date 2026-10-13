@@ -1,0 +1,36 @@
+{
+  "updated_at": "2026-10-12",
+  "summary": "金价 1 月底创 5400~5600 美元历史高点后回落两成以上，10 月 6~7 日下探约 4128 后反弹至 4200 附近。短期受美联储加息周期、美债收益率 20 余年高位和强美元压制；中长期央行购金、ETF 资金流入、美国财政债务与地缘风险构成支撑。",
+  "factors": [
+    {"name": "美联储货币政策", "impact": -2, "weight": 1.5,
+     "note": "9 月加息 25bp 至 3.75%-4.00%，会议纪要偏鹰，市场预期 12 月可能再加息；10 月加息概率较低"},
+    {"name": "美债收益率", "impact": -2, "weight": 1.2,
+     "note": "10 年期一度升至 5.33%，为 2002 年以来最高，持有黄金机会成本上升"},
+    {"name": "美元指数", "impact": -1, "weight": 1.0,
+     "note": "美元指数约 102，处于两个月高位附近"},
+    {"name": "央行购金", "impact": 2, "weight": 1.2,
+     "note": "全球央行持续增持，中国央行继续增加黄金储备；WGC 调查显示多数央行计划增持"},
+    {"name": "黄金 ETF 资金流", "impact": 1, "weight": 0.8,
+     "note": "WGC：全球黄金 ETF 三季度净流入创历史新高"},
+    {"name": "地缘与政治风险", "impact": 1, "weight": 0.8,
+     "note": "中东局势紧张、能源价格高企；美国 11 月初中期选举带来政治不确定性"},
+    {"name": "通胀与能源", "impact": 0, "weight": 0.8,
+     "note": "原油约 90 美元，通胀粘性：一方面强化加息预期（利空），一方面抬升抗通胀需求（利多）"},
+    {"name": "美国就业/经济", "impact": 1, "weight": 0.7,
+     "note": "9 月非农偏弱、家庭债务逾期上升，若经济明显降温将提升避险与降息预期"},
+    {"name": "技术面", "impact": 0, "weight": 0.6,
+     "note": "日线 MACD 在零轴下方，RSI≈45；支撑 4100/4060，压力 4220-4240、4300"}
+  ],
+  "upcoming_events": [
+    "2026-10-14 美国 9 月 CPI",
+    "2026-10-27~28 FOMC 议息会议（市场预期暂停加息概率较高）",
+    "2026-11-03 美国中期选举"
+  ],
+  "sources": [
+    "https://www.cnbc.com/2026/09/23/gold-lacklustre-as-higher-for-longer-rate-outlook-weighs-on-sentiment.html",
+    "https://www.ssga.com/library-content/products/fund-docs/etfs/us/insights-investment-ideas/monthly-gold-monitor.pdf",
+    "https://xt214.com/gold-price-pullback-strong-dollar-yields-oct2026",
+    "https://www.monetamarkets.com/cn/markets-analysis/high-us-bond-yields-weigh-on-gold-1010",
+    "https://k.sina.com.cn/article_7857201856_1d45362c001908qguw.html"
+  ]
+}
