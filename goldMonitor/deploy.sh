@@ -192,8 +192,7 @@ until health; do
 done
 printf "\n"
 ok "goldMonitor 已就绪"
-IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-echo "    访问地址：http://${IP:-localhost}:${PORT}"
+echo "    本机地址：http://127.0.0.1:${PORT}"
 echo "    首次启动会在后台下载近两年行情并训练模型，约需 1 分钟，网页会显示“下载中”"
 echo "    跟踪日志：bash deploy.sh --logs  或  docker compose -p $PROJECT logs -f"
 echo "    停止服务：bash deploy.sh --stop"
