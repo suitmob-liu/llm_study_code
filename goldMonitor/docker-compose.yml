@@ -10,6 +10,7 @@ services:
     ports:
       - "${PORT:-1012}:8000"
     environment:
+      DATA_SOURCE: ${DATA_SOURCE:-auto}
       REFRESH_MINUTES: ${REFRESH_MINUTES:-5}
       PREDICT_INTERVAL_HOURS: ${PREDICT_INTERVAL_HOURS:-5}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}

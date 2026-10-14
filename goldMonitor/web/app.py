@@ -146,7 +146,12 @@ def latest():
         g = data.read(con, "gold", "1h", start=pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=10))
         gd = data.read(con, "gold", "1d", start=pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=15))
         if g.empty:
-            return ok({"ready": False, "message": "正在首次下载行情数据，请稍候刷新…", "state": STATE})
+            msg = "正在首次下载行情数据，请稍候刷新…"
+            lr = store.get_meta(con, "last_refresh")
+            bad = [k for k, v in (lr or {}).get("status", {}).items() if not v.get("ok")]
+            if lr and "gold_1h" in bad:
+                msg = f"行情下载失败（{lr['status']['gold_1h'].get('error', '')[:120]}），将在下次刷新时重试"
+            return ok({"ready": False, "message": msg, "state": STATE})
         last_t, last = g.index[-1], float(g["close"].iloc[-1])
         prev = float(gd["close"].iloc[-2]) if len(gd) >= 2 else None
         today = gd.iloc[-1] if not gd.empty else None
@@ -154,8 +159,12 @@ def latest():
         fx = float(fxd["close"].iloc[-1]) if not fxd.empty else None
         macros = {}
         for m in ("dxy", "tnx", "vix", "silver", "oil", "usdcny"):
-            iv = "1h" if m in data.HOURLY else "1d"
-            df = data.read(con, m, iv, start=pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=10))
+            since = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=10)
+            dh = data.read(con, m, "1h", start=since) if m in data.HOURLY else pd.DataFrame()
+            dd = data.read(con, m, "1d", start=since)
+            # 用更新的那个（备用源下美债、VIX 只有日线）
+            use_h = not dh.empty and (dd.empty or dh.index[-1] >= dd.index[-1])
+            iv, df = ("1h", dh) if use_h else ("1d", dd)
             if df.empty:
                 continue
             v, t = float(df["close"].iloc[-1]), df.index[-1]
@@ -223,6 +232,8 @@ def chart(range: str = "1y", symbol: str = "gold", overlay: str | None = None,
         if overlay and overlay in data.SYMBOLS and overlay != symbol:
             oiv = interval if overlay in data.HOURLY else "1d"
             od = data.read(con, overlay, oiv, start=df.index[0], end=t1)
+            if oiv == "1h" and (od.empty or od.index[-1] < df.index[-1] - pd.Timedelta(days=3)):
+                od = data.read(con, overlay, "1d", start=df.index[0], end=t1)  # 备用源只有日线
             out["overlay"] = {"symbol": overlay, "name": data.NAMES_CN[overlay],
                               "data": [[t, v] for t, v in zip(_ms(od.index), od["close"])]}
         fxd = data.read(con, "usdcny", "1d", start=df.index[0] - pd.Timedelta(days=10), end=t1)

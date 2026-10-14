@@ -28,7 +28,9 @@ def train_model(con, cfg, hourly, daily, reason="手动重新训练", verbose=Tr
         save_model(model)
         save_config(cfg)
         metrics = {h: hm["metrics"] for h, hm in model["horizons"].items()}
-        changes = [f"[{h}] 重新训练：λ={hm['lambda']}，样本外方向准确率 {hm['metrics']['dir_acc']:.1%}，"
+        changes = [f"[{h}] 重新训练：历史数据不足，暂不做方向判断，只给区间（数据积累后重训会自动恢复）"
+                   if hm["metrics"].get("insufficient") else
+                   f"[{h}] 重新训练：λ={hm['lambda']}，样本外方向准确率 {hm['metrics']['dir_acc']:.1%}，"
                    f"MAE ${hm['metrics']['mae_usd']:.1f}（不变基准 ${hm['metrics']['mae_rw_usd']:.1f}），"
                    f"权重 {hm['val_weights']}" for h, hm in model["horizons"].items()]
         store.add_history(con, cfg["version"], "train", changes, metrics, note=reason)

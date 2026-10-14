@@ -95,10 +95,19 @@ def train(feat: pd.DataFrame, cfg: dict, verbose: bool = True) -> dict:
                 best = (mse, lam, hm)
         _, lam, hm_tr = best
         comp_va = _components(hm_tr, Xva)
-        weights = _grid_weights(comp_va, yva)
-        ens_va = sum(weights[c] * comp_va[c] for c in COMPONENTS)
-        resid = yva - ens_va
-        vol_ref = float(Xva["vol120"].median())
+        # 验证集覆盖的独立预测窗口太少（例如新部署只有约 2 个月小时线）时，样本外结论不可信：
+        # 不做方向判断（全部权重给“不变”），区间用全部历史的同周期涨跌分布估计
+        val_span_h = (Xva.index[-1] - Xva.index[0]).total_seconds() / 3600
+        enough = len(yva) >= 200 and val_span_h >= 30 * hours
+        if enough:
+            weights = _grid_weights(comp_va, yva)
+            ens_va = sum(weights[c] * comp_va[c] for c in COMPONENTS)
+            resid = yva - ens_va
+        else:
+            weights = {c: (1.0 if c == "randomwalk" else 0.0) for c in COMPONENTS}
+            ens_va = np.zeros(len(yva))
+            resid = y  # 全部样本的同周期收益
+        vol_ref = float((Xva if enough else X)["vol120"].median())
 
         # 指标（验证集 = 最近 20% 样本，样本外）
         price_va = Xva["close"].to_numpy()
@@ -111,18 +120,26 @@ def train(feat: pd.DataFrame, cfg: dict, verbose: bool = True) -> dict:
             "skill_vs_rw": float(1 - np.mean(resid ** 2) / np.mean(yva ** 2)),
             "comp_dir_acc": {c: float(np.mean(np.sign(comp_va[c]) == np.sign(yva)))
                              for c in COMPONENTS if c != "randomwalk"},
+            "insufficient": not enough,
         }
 
         # 用全部数据重新拟合系数，权重/残差分布沿用样本外结果
         hm = _fit_parts(X, y, cols, lam, h)
         lo_q = (1 - cfg["interval_level"]) / 2
+        if enough:
+            q_lo, q_hi = float(np.quantile(resid, lo_q)), float(np.quantile(resid, 1 - lo_q))
+        else:  # 短历史里的单边行情不代表未来，区间取对称
+            q_hi = float(np.quantile(np.abs(resid - resid.mean()), cfg["interval_level"]))
+            q_lo = -q_hi
         hm.update({
             "hours": hours, "val_weights": weights, "resid_std": float(resid.std()),
-            "q_lo": float(np.quantile(resid, lo_q)), "q_hi": float(np.quantile(resid, 1 - lo_q)),
+            "q_lo": q_lo, "q_hi": q_hi,
             "vol_ref": vol_ref, "metrics": metrics, "n_train": n,
         })
         model["horizons"][h] = hm
-        if verbose:
+        if verbose and not enough:
+            print(f"  [{h}] 样本 {n}，历史数据不足（验证集仅 {val_span_h / 24:.0f} 天），暂不做方向判断，只给区间")
+        elif verbose:
             m = metrics
             print(f"  [{h}] 样本 {n}，λ={lam}，验证集方向准确率 {m['dir_acc']:.1%}，"
                   f"MAE ${m['mae_usd']:.1f}（不变基准 ${m['mae_rw_usd']:.1f}），"

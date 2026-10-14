@@ -516,7 +516,7 @@ async function loadForecast() {
     const rel = s ? (1 - s.mae_usd / s.mae_rw_usd) * 100 : null;
     return `<tr><td>${HCN[h]}</td><td class="r">${s ? s.n : 0}</td><td class="r">${s ? (s.dir_acc * 100).toFixed(0) + '%' : '—'}</td><td class="r">${s ? (s.coverage * 100).toFixed(0) + '%' : '—'}</td>
       <td class="r">${s ? '$' + num(s.mae_usd) : '—'}</td><td class="r">${s ? '$' + num(s.mae_rw_usd) : '—'}</td><td class="r">${rel == null ? '—' : `<span class="${rel > 0 ? 'ok' : 'bad'}">${signed(rel, 1)}%</span>`}</td>
-      <td class="r muted">${v ? (v.dir_acc * 100).toFixed(1) + '%' : '—'}</td><td class="r muted">${v ? '$' + num(v.mae_usd) + ' / $' + num(v.mae_rw_usd) : '—'}</td></tr>`;
+      <td class="r muted">${v ? (v.insufficient ? '数据不足' : v.dir_acc == null ? '—' : (v.dir_acc * 100).toFixed(1) + '%') : '—'}</td><td class="r muted">${v ? '$' + num(v.mae_usd) + ' / $' + num(v.mae_rw_usd) : '—'}</td></tr>`;
   });
   $('#accTable').innerHTML = `<thead><tr><th>周期</th><th class="r">已验证</th><th class="r">方向准确率</th><th class="r">区间覆盖率(目标80%)</th><th class="r">平均误差</th><th class="r">"不变"基准误差</th><th class="r">优于基准</th><th class="r">训练验证集方向</th><th class="r">验证集误差/基准</th></tr></thead><tbody>${rows.join('')}</tbody>`;
   $('#histList').innerHTML = a.history.length ? a.history.map(h => `<div class="hist"><div class="t">v${h.version} · ${h.kind === 'train' ? '训练' : '反馈调整'} · ${bj(h.created_at, 'md')}</div><div class="muted small">${esc(h.note)}</div><ul>${h.changes.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('') : '<div class="empty">暂无</div>';
@@ -636,10 +636,10 @@ async function loadSystem() {
   $('#sysTable').innerHTML = '<tbody>' + rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('') + '</tbody>';
   $('#sysEvents').innerHTML = st.last_events.map(e => `<li><span class="muted">${bj(e.at, 'md')}</span> ${esc(e.msg)}</li>`).join('') || '<li class="muted">暂无</li>';
   const names = { gold: '黄金', dxy: '美元指数', tnx: '10年美债', silver: '白银', oil: '原油', vix: 'VIX', usdcny: '美元/人民币' };
-  $('#dataTable').innerHTML = '<thead><tr><th>品种</th><th>周期</th><th class="r">条数</th><th>最早</th><th>最新</th><th>最近刷新</th></tr></thead><tbody>'
+  $('#dataTable').innerHTML = '<thead><tr><th>品种</th><th>周期</th><th class="r">条数</th><th>最早</th><th>最新</th><th>最近刷新 / 来源</th></tr></thead><tbody>'
     + Object.entries(s.prices).map(([k, v]) => {
       const [sym, iv] = k.split('_'); const rs = lr && lr.status[k];
-      return `<tr><td>${names[sym] || sym}</td><td>${iv === '1h' ? '小时线' : '日线'}</td><td class="r">${num(v.rows, 0)}</td><td>${bj(new Date(v.first * 1000).toISOString(), 'date')}</td><td>${bj(new Date(v.last * 1000).toISOString())}</td><td>${rs ? (rs.ok ? '<span class="ok">✓</span>' : `<span class="bad" title="${esc(rs.error)}">✗</span>`) : '—'}</td></tr>`;
+      return `<tr><td>${names[sym] || sym}</td><td>${iv === '1h' ? '小时线' : '日线'}</td><td class="r">${num(v.rows, 0)}</td><td>${bj(new Date(v.first * 1000).toISOString(), 'date')}</td><td>${bj(new Date(v.last * 1000).toISOString())}</td><td>${rs ? (rs.skipped ? `<span class="muted" title="${esc(rs.note)}">日线补齐</span>` : rs.ok ? `<span class="ok">✓</span> <span class="muted">${esc(rs.source || '')}</span>` : `<span class="bad" title="${esc(rs.error)}">✗</span> <span class="muted small">${esc((rs.error || '').slice(0, 60))}</span>`) : '—'}</td></tr>`;
     }).join('') + '</tbody>';
 }
 $('#tokenInput').value = store.get('adminToken', '');

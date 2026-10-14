@@ -98,6 +98,24 @@ python main.py history              # 累计准确率、最近预测、模型变
 | VIX | ^VIX | 避险情绪 |
 | 美元/人民币 | CNY=X | 人民币金价折算 |
 
+**备用数据源**：Yahoo 经常封禁云服务器 IP（返回 `429 Too Many Requests`）。默认的 `DATA_SOURCE=auto` 会在 Yahoo 失败时自动切换到备用源，6 小时后再尝试 Yahoo。可以在 `.env` 中设为 `backup`，只使用备用源。
+
+| 品种 | 备用源 |
+|---|---|
+| 黄金 / 白银 / WTI 原油 | 新浪财经 COMEX 期货（60 分钟线约近 2 个月 + 日线） |
+| 美元指数 | 新浪财经（60 分钟线约近 1 个月 + 日线） |
+| 美元/人民币 | 新浪财经（日线） |
+| 10 年美债收益率 | 美国财政部官网（日线） |
+| VIX | CBOE 官网（日线） |
+
+备用源的小时线只有近 1~2 个月。全新部署时，模型会因历史不足而暂不做方向判断，只给出区间。可以从已有的 `gold.db` 导入历史小时线，导入后立即可用：
+
+```bash
+docker cp gold.db gold-analyzer:/tmp/seed.db
+docker exec gold-analyzer python main.py import-prices /tmp/seed.db
+docker exec gold-analyzer python main.py train
+```
+
 ## 模型
 
 每个预测周期单独训练，由 4 个分量加权集成：

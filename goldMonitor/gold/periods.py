@@ -36,12 +36,13 @@ def bounds(kind: str, d: date) -> tuple[pd.Timestamp, pd.Timestamp, str]:
 
 
 def _bars(con, name: str, start=None, end=None) -> pd.DataFrame:
-    """小时线 + 更早的日线，统一为北京时间索引。"""
+    """小时线 + 小时线覆盖不到的日线（更早的历史，或备用源只有日线时的近期数据），统一为北京时间索引。"""
     h = data.read(con, name, "1h", start, end) if name in data.HOURLY else pd.DataFrame()
     d = data.read(con, name, "1d", start, end)
     if not h.empty and not d.empty:
-        d = d[d.index < h.index[0]]
-    df = pd.concat([d, h]) if not h.empty else d
+        d = d[(d.index < h.index[0]) | (d.index > h.index[-1])]
+    parts = [x for x in (d, h) if not x.empty]
+    df = pd.concat(parts).sort_index() if len(parts) > 1 else (parts[0] if parts else d)
     if df.empty:
         return df
     df = df.copy()

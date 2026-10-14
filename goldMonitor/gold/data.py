@@ -1,9 +1,12 @@
-"""行情数据抓取与存储（Yahoo Finance chart 接口 → SQLite prices 表）。
+"""行情数据抓取与存储（Yahoo Finance chart 接口 → SQLite prices 表，Yahoo 不可用时自动切换备用源）。
 
 - 小时线：首次拉取最近 730 天，之后增量拉取最近 5 天并 upsert，历史会越积越长
 - 日线：首次拉取 2 年，之后增量覆盖最近 1 个月
+- DATA_SOURCE 环境变量：auto（默认，Yahoo 失败自动用备用源）/ yahoo / backup（只用备用源，见 sources.py）
 所有时间戳均为 UTC。
 """
+import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
@@ -11,8 +14,13 @@ from urllib.parse import quote
 import pandas as pd
 import requests
 
-from . import store
+from . import sources, store
 from .config import RAW_DIR
+
+log = logging.getLogger("gold.data")
+DATA_SOURCE = os.environ.get("DATA_SOURCE", "auto").strip().lower()
+YAHOO_RETRY_SECONDS = 6 * 3600  # Yahoo 被封后，隔多久再试一次
+_yahoo_blocked_until = 0.0
 
 URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -41,6 +49,8 @@ def fetch_chart(symbol: str, rng: str, interval: str, retries: int = 3) -> pd.Da
             r = requests.get(URL.format(symbol=quote(symbol)),
                              params={"range": rng, "interval": interval},
                              headers=HEADERS, timeout=30)
+            if r.status_code == 429:  # 被限流/封 IP，重试无意义
+                raise RuntimeError("429 Too Many Requests（Yahoo 拒绝了本机 IP）")
             r.raise_for_status()
             chart = r.json()["chart"]
             if chart.get("error"):
@@ -53,6 +63,8 @@ def fetch_chart(symbol: str, rng: str, interval: str, retries: int = 3) -> pd.Da
             return df[~df.index.duplicated(keep="last")].sort_index()
         except Exception as e:  # noqa: BLE001
             last_err = e
+            if "429" in str(e):
+                break
             time.sleep(2 * (i + 1))
     raise RuntimeError(f"获取 {symbol} {interval} 失败: {last_err}")
 
@@ -102,42 +114,106 @@ def _migrate_csv(con):
             _write(con, name, interval, df)
 
 
+def _parallel(fn, jobs: dict) -> dict:
+    """并发执行 {key: args}，返回 {key: DataFrame 或 Exception}。"""
+    out = {}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futs = {k: ex.submit(fn, *v) for k, v in jobs.items()}
+    for k, f in futs.items():
+        try:
+            out[k] = f.result()
+        except Exception as e:  # noqa: BLE001
+            out[k] = e
+    return out
+
+
 def refresh(con=None, full: bool | None = None, verbose: bool = False) -> dict:
     """从网络更新行情。full=None 时自动判断：库里没数据就全量，否则增量。返回每个品种的状态。"""
+    global _yahoo_blocked_until
     own = con is None
     con = con or store.connect()
     _migrate_csv(con)
-    jobs = {}
-    for name, sym in SYMBOLS.items():
+    keys, is_full = [], {}
+    for name in SYMBOLS:
         for interval in ("1h", "1d"):
             if interval == "1h" and name not in HOURLY:
                 continue
-            is_full = full if full is not None else _count(con, name, interval) == 0
-            rng = ("730d" if interval == "1h" else "2y") if is_full else ("5d" if interval == "1h" else "1mo")
-            jobs[(name, interval)] = (sym, rng, interval)
-    # 并发抓取，串行写库
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = {k: ex.submit(fetch_chart, *v) for k, v in jobs.items()}
-    status = {}
-    for (name, interval), fut in futs.items():
-        key = f"{name}_{interval}"
-        try:
-            df = fut.result()
-            if interval == "1h":
-                df.index = df.index.floor("h")  # 实时报价并入所在小时
-                df = df[~df.index.duplicated(keep="last")]
-                _write(con, name, interval, df)
+            keys.append((name, interval))
+            is_full[(name, interval)] = full if full is not None else _count(con, name, interval) == 0
+
+    results: dict = {}   # key -> (DataFrame, 来源)
+    errors: dict = {}    # key -> 错误信息
+    use_yahoo = DATA_SOURCE == "yahoo" or (DATA_SOURCE == "auto" and time.time() >= _yahoo_blocked_until)
+    if use_yahoo:
+        jobs = {}
+        for name, interval in keys:
+            f = is_full[(name, interval)]
+            rng = ("730d" if interval == "1h" else "2y") if f else ("5d" if interval == "1h" else "1mo")
+            jobs[(name, interval)] = (SYMBOLS[name], rng, interval)
+        for k, v in _parallel(fetch_chart, jobs).items():
+            if isinstance(v, Exception):
+                errors[k] = str(v)
             else:
-                _write(con, name, interval, df, replace_from=df.index[0])
-            status[key] = {"ok": True, "rows": len(df), "last": df.index[-1].isoformat()}
-        except Exception as e:  # noqa: BLE001
-            status[key] = {"ok": False, "error": str(e)}
+                results[k] = (v, "Yahoo")
+        if DATA_SOURCE == "auto" and ("gold", "1h") in errors:
+            _yahoo_blocked_until = time.time() + YAHOO_RETRY_SECONDS
+            log.warning("Yahoo 不可用（%s），切换备用源，%d 小时后再尝试 Yahoo",
+                        errors[("gold", "1h")], YAHOO_RETRY_SECONDS // 3600)
+
+    skipped = {}
+    if DATA_SOURCE != "yahoo":
+        pending = [k for k in keys if k not in results]
+        jobs = {k: (k[0], k[1], is_full[k]) for k in pending if k[1] in sources.SUPPORTED.get(k[0], ())}
+        for k in pending:
+            if k not in jobs:
+                skipped[k] = "备用源只有日线，小时数据由日线补齐"
+        for k, v in _parallel(sources.fetch, jobs).items():
+            if isinstance(v, Exception):
+                errors[k] = f"{errors[k]}；备用源：{v}" if k in errors else f"备用源：{v}"
+            else:
+                results[k] = (v, sources.SOURCE_NAME.get(k[0], "备用源"))
+                errors.pop(k, None)
+
+    status = {}
+    for name, interval in keys:
+        key = f"{name}_{interval}"
+        if (name, interval) in results:
+            df, src = results[(name, interval)]
+            try:
+                if interval == "1h":
+                    df.index = df.index.floor("h")  # 实时报价并入所在小时
+                    df = df[~df.index.duplicated(keep="last")]
+                    _write(con, name, interval, df)
+                else:
+                    _write(con, name, interval, df, replace_from=df.index[0])
+                status[key] = {"ok": True, "rows": len(df), "last": df.index[-1].isoformat(), "source": src}
+                continue
+            except Exception as e:  # noqa: BLE001
+                errors[(name, interval)] = f"写库失败：{e}"
+        if (name, interval) in skipped:
+            status[key] = {"ok": True, "rows": 0, "skipped": True, "note": skipped[(name, interval)]}
+        else:
+            status[key] = {"ok": False, "error": errors.get((name, interval), "未知错误")}
             if verbose:
-                print(f"[警告] {e}")
+                print(f"[警告] {key}: {status[key]['error']}")
     store.set_meta(con, "last_refresh", {"at": store.now_iso(), "status": status})
     if own:
         con.close()
     return status
+
+
+def _extend_with_daily(h: pd.DataFrame | None, d: pd.DataFrame | None) -> pd.DataFrame | None:
+    """小时线之后（或没有小时线时）用日线补齐：日线按纽约收盘时刻（约 21:00 UTC）放入，避免提前看到当天数据。"""
+    if d is None or d.empty:
+        return h
+    d = d.copy()
+    d.index = d.index + pd.Timedelta(hours=17)
+    if h is not None and not h.empty:
+        d = d[d.index > h.index[-1]]
+        if d.empty:
+            return h
+        return pd.concat([h, d])
+    return d
 
 
 def load(refresh_data: bool = True, verbose: bool = True, con=None) -> tuple[dict, dict]:
@@ -150,13 +226,15 @@ def load(refresh_data: bool = True, verbose: bool = True, con=None) -> tuple[dic
         _migrate_csv(con)
     hourly, daily = {}, {}
     for name in SYMBOLS:
-        if name in HOURLY:
-            df = read(con, name, "1h")
-            if not df.empty:
-                hourly[name] = df
         df = read(con, name, "1d")
         if not df.empty:
             daily[name] = df
+        if name in HOURLY:
+            h = read(con, name, "1h")
+            if name != "gold":  # 外部因子：小时线断档（备用源只有日线）时用日线补齐
+                h = _extend_with_daily(h if not h.empty else None, daily.get(name))
+            if h is not None and not h.empty:
+                hourly[name] = h
     if own:
         con.close()
     if "gold" not in hourly:
@@ -166,6 +244,20 @@ def load(refresh_data: bool = True, verbose: bool = True, con=None) -> tuple[dic
         print(f"行情：黄金小时线 {len(g)} 条（{g.index[0]:%Y-%m-%d} ~ {g.index[-1]:%Y-%m-%d %H:%M} UTC），"
               f"日线 {len(daily.get('gold', []))} 条")
     return hourly, daily
+
+
+def import_prices(con, src_db: str) -> dict:
+    """从另一个 gold.db 导入行情（已有的记录不覆盖），用于给新部署补充历史数据。"""
+    con.execute("ATTACH DATABASE ? AS src", (src_db,))
+    try:
+        before = dict(con.execute("SELECT symbol || '_' || interval, COUNT(*) FROM prices GROUP BY 1").fetchall())
+        con.execute("INSERT OR IGNORE INTO prices SELECT symbol, interval, ts, open, high, low, close, volume "
+                    "FROM src.prices")
+        con.commit()
+        after = dict(con.execute("SELECT symbol || '_' || interval, COUNT(*) FROM prices GROUP BY 1").fetchall())
+    finally:
+        con.execute("DETACH DATABASE src")
+    return {k: after[k] - before.get(k, 0) for k in sorted(after)}
 
 
 def asof(df: pd.DataFrame | None, t: pd.Timestamp, col: str = "close"):

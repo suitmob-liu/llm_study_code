@@ -9,6 +9,7 @@
   python main.py run         evaluate + predict（适合定时任务）
   python main.py history     查看历史预测、准确率与模型变更
   python main.py context     查看国际基本面情景打分
+  python main.py import-prices <gold.db>   从另一个数据库导入历史行情（已有记录不覆盖）
 """
 import argparse
 import json
@@ -83,7 +84,9 @@ def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description="黄金金价走势分析与预测工具")
-    ap.add_argument("cmd", choices=["serve", "analyze", "train", "predict", "evaluate", "run", "history", "context"])
+    ap.add_argument("cmd", choices=["serve", "analyze", "train", "predict", "evaluate", "run", "history", "context",
+                                    "import-prices"])
+    ap.add_argument("path", nargs="?", help="import-prices：要导入的 gold.db 路径")
     ap.add_argument("--offline", action="store_true", help="不联网，只用本地数据库中的数据")
     ap.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
     ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 1012)))
@@ -102,6 +105,13 @@ def main():
         return
     if args.cmd == "history":
         do_history(con, cfg)
+        return
+    if args.cmd == "import-prices":
+        if not args.path or not os.path.exists(args.path):
+            sys.exit("用法：python main.py import-prices <gold.db 路径>")
+        added = data.import_prices(con, args.path)
+        detail = "，".join(f"{k} +{v}" for k, v in added.items() if v)
+        print(f"已导入行情：{detail}" if detail else "没有新增记录")
         return
 
     hourly, daily = data.load(refresh_data=not args.offline, con=con)
