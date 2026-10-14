@@ -21,6 +21,7 @@
   </nav>
   <div class="top-right">
     <span id="live" class="live" title="行情状态"><i></i><span>连接中</span></span>
+    <div class="seg small" id="unitSegG" title="价格单位（所有页面）"><button data-v="usd">$/盎司</button><button data-v="cny">¥/克</button></div>
     <button id="themeBtn" class="icon-btn" title="切换深浅色">◐</button>
   </div>
 </header>
@@ -30,7 +31,7 @@
   <section id="tab-overview" class="tab active">
     <div class="hero card">
       <div class="hero-main">
-        <div class="muted small">COMEX 黄金期货 · 美元/盎司</div>
+        <div class="muted small">COMEX 黄金期货 · <span id="heroUnit">美元/盎司</span></div>
         <div class="hero-price" id="heroPrice">—</div>
         <div class="hero-change" id="heroChange"></div>
         <div class="hero-sub" id="heroSub"></div>
@@ -63,7 +64,6 @@
         <button data-v="2y">2年</button>
       </div>
       <div class="seg" id="typeSeg"><button data-v="line" class="active">折线</button><button data-v="candle">K线</button></div>
-      <div class="seg" id="unitSeg"><button data-v="usd" class="active">美元/盎司</button><button data-v="cny">人民币/克</button></div>
       <label class="field">对比
         <select id="overlaySel">
           <option value="">无</option><option value="dxy">美元指数</option><option value="tnx">10年美债收益率</option>
@@ -186,7 +186,7 @@
   </section>
 </main>
 
-<footer class="muted small">数据来源 Yahoo Finance（COMEX 黄金期货 GC=F 等），人民币价格按美元兑人民币汇率折算，未含国内溢价。模型输出仅供研究参考，不构成投资建议。</footer>
+<footer class="muted small">数据来源 Yahoo Finance / 新浪财经（COMEX 黄金期货）等。人民币/克按当时的美元兑人民币汇率折算（1 盎司 = 31.1035 克），未含国内溢价，与上海金交所价格会有差异。模型输出仅供研究参考，不构成投资建议。</footer>
 <div id="toast" class="toast"></div>
 <script src="/static/app.js"></script>
 </body>

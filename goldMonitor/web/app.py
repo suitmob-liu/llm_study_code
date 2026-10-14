@@ -190,7 +190,7 @@ def latest():
 
 
 RANGES = {"1d": (1, "1h"), "5d": (5, "1h"), "1m": (31, "1h"), "3m": (92, "1d"), "6m": (183, "1d"),
-          "1y": (366, "1d"), "2y": (731, "1d"), "all": (None, "1d")}
+          "1y": (365, "1d"), "2y": (730, "1d"), "all": (None, "1d")}  # 1y 与“近一年复盘”的起点一致
 
 
 @app.get("/api/chart")
@@ -239,6 +239,17 @@ def chart(range: str = "1y", symbol: str = "gold", overlay: str | None = None,
         fxd = data.read(con, "usdcny", "1d", start=df.index[0] - pd.Timedelta(days=10), end=t1)
         out["usdcny"] = [[t, v] for t, v in zip(_ms(fxd.index), fxd["close"])]
         return ok(out)
+    finally:
+        con.close()
+
+
+@app.get("/api/fx")
+def fx():
+    """美元兑人民币日线，前端用于按当时汇率换算 人民币/克。"""
+    con = store.connect()
+    try:
+        d = data.read(con, "usdcny", "1d")
+        return ok({"items": [[t, v] for t, v in zip(_ms(d.index), d["close"])]})
     finally:
         con.close()
 

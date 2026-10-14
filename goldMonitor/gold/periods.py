@@ -159,7 +159,7 @@ def period_detail(con, kind: str, d: date) -> dict:
 
     # 该时段内做出的预测
     preds = [dict(r) for r in con.execute(
-        "SELECT id, horizon, base_time, base_price, target_time, pred_price, lower, upper, direction, prob_up, "
+        "SELECT id, horizon, base_time, base_price, usdcny, target_time, pred_price, lower, upper, direction, prob_up, "
         "status, actual_price, error_usd, direction_hit, in_interval FROM predictions "
         "WHERE base_time >= ? AND base_time < ? ORDER BY base_time",
         (s.tz_convert("UTC").isoformat(), e.tz_convert("UTC").isoformat())).fetchall()]

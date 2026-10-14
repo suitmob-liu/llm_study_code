@@ -57,6 +57,43 @@ const DIR_CLS = { '上涨': 'up', '偏涨': 'up', '下跌': 'down', '偏跌': 'd
 const DIR_ICON = { '上涨': '▲', '偏涨': '↗', '下跌': '▼', '偏跌': '↘', '震荡': '↔' };
 const HCN = { '5h': '未来5小时', '1d': '未来1天', '7d': '未来7天' };
 
+/* ———————— 价格单位：美元/盎司 ⇄ 人民币/克（按当时汇率） ———————— */
+const UNIT_Q = new URLSearchParams(location.search).get('unit');   // 链接可带 ?unit=cny
+let UNIT = (UNIT_Q || store.get('unit', 'usd')) === 'cny' ? 'cny' : 'usd';
+let FX = [];   // [[毫秒, 美元兑人民币]]，升序
+const isCny = () => UNIT === 'cny';
+const toMs = t => t == null ? Date.now() : typeof t === 'number' ? t : new Date(t).getTime();
+function rateAt(t) {
+  if (!FX.length) return null;
+  const ms = toMs(t);
+  let lo = 0, hi = FX.length - 1;
+  if (ms < FX[0][0]) return FX[0][1];
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (FX[mid][0] <= ms) lo = mid; else hi = mid - 1; }
+  return FX[lo][1];
+}
+// 换算：rate 优先（如预测记录保存的汇率），否则按 t 时刻的汇率；价差同样适用
+function cv(usd, t, rate) {
+  if (usd == null || isNaN(usd)) return null;
+  if (!isCny()) return usd;
+  const r = rate || rateAt(t);
+  return r ? usd * r / OZ : null;
+}
+const DEC = () => isCny() ? 2 : 1;
+const SYM = () => isCny() ? '¥' : '$';
+const UNIT_CN = () => isCny() ? '人民币/克' : '美元/盎司';
+const UNIT_S = () => isCny() ? '¥/克' : '$/盎司';
+const P = (usd, t, rate) => num(cv(usd, t, rate), DEC());                     // 数值
+const PS = (usd, t, rate) => { const v = cv(usd, t, rate); return v == null ? '—' : SYM() + num(v, DEC()); };   // 带符号
+const PD = (usd, t, rate) => signed(cv(usd, t, rate), DEC());                 // 价差
+function alt(usd, t, rate) {                                                  // 另一种单位，作辅助显示
+  const r = rate || rateAt(t);
+  if (usd == null || !r) return '';
+  return isCny() ? `≈ $${num(usd, 1)}/盎司` : `≈ ¥${num(usd * r / OZ, 2)}/克`;
+}
+async function loadFx() {
+  try { FX = (await api('/api/fx')).items || []; } catch { FX = []; }
+}
+
 /* ———————— 图表基础 ———————— */
 const charts = {};
 const renderers = {};   // id -> 重绘函数（切换主题时调用）
@@ -175,6 +212,14 @@ function seg(id, onChange) {
 }
 function setSeg(id, v) { $$(`#${id} button`).forEach(x => x.classList.toggle('active', x.dataset.v === v)); }
 
+// 全局单位切换：所有已打开的页面按新单位重绘
+setSeg('unitSegG', UNIT);
+seg('unitSegG', v => {
+  UNIT = v; store.set('unit', v);
+  if (!loaded.overview) loadLatest();
+  for (const k of Object.keys(loaded)) if (k !== 'context' && k !== 'system') loaders[k]();
+});
+
 /* ———————— 总览 ———————— */
 let lastRefreshStamp = null;
 
@@ -183,14 +228,17 @@ async function loadLatest() {
   try { d = await api('/api/latest'); } catch (e) { setLive('err', '连接失败'); return; }
   if (!d.ready) { setLive('', d.message); $('#heroPrice').textContent = '下载中…'; return; }
   setLive(d.market_open ? 'on' : 'closed', d.market_open ? '交易中' : '休市');
-  $('#heroPrice').textContent = '$' + num(d.price, 1);
-  $('#heroChange').innerHTML = `${chg(d.change, 1, '')} &nbsp; ${chg(d.change_pct)} <span class="muted small">较上一交易日</span>`;
+  const r0 = d.usdcny;   // 实时价格用最新汇率
+  $('#heroUnit').textContent = UNIT_CN();
+  $('#heroPrice').textContent = PS(d.price, d.time, r0);
+  $('#heroChange').innerHTML = `${chg(cv(d.change, d.time, r0), DEC(), '')} &nbsp; ${chg(d.change_pct)} <span class="muted small">较上一交易日</span>`;
   $('#heroSub').innerHTML = [
-    d.price_cny_g ? `<span>≈ <b>¥${num(d.price_cny_g, 2)}</b>/克</span>` : '',
-    `<span>日内高 ${num(d.day_high)} / 低 ${num(d.day_low)}</span>`,
+    `<span><b>${alt(d.price, d.time, r0)}</b></span>`,
+    `<span>日内高 ${P(d.day_high, d.time, r0)} / 低 ${P(d.day_low, d.time, r0)}</span>`,
+    r0 ? `<span>汇率 ${num(r0, 4)}</span>` : '',
     `<span>更新于 ${bj(d.time, 'md')}</span>`,
   ].join('');
-  document.title = `$${num(d.price, 1)} · 黄金走势分析`;
+  document.title = `${PS(d.price, d.time, r0)} · 黄金走势分析`;
 
   const order = ['dxy', 'tnx', 'vix', 'silver', 'oil', 'usdcny'];
   $('#macroTiles').innerHTML = order.filter(k => d.macros[k]).map(k => {
@@ -202,12 +250,12 @@ async function loadLatest() {
 
   draw('spark', () => {
     const t = T();
-    const pts = d.spark[0].map((x, i) => [x, d.spark[1][i]]);
+    const pts = d.spark[0].map((x, i) => [x, cv(d.spark[1][i], x)]);
     return {
       animation: false, grid: { left: 0, right: 0, top: 6, bottom: 6 },
       xAxis: { type: 'time', show: false }, yAxis: { type: 'value', scale: true, show: false },
       tooltip: { trigger: 'axis', backgroundColor: t.surface, borderColor: t.border, textStyle: { color: t.ink, fontSize: 12 },
-        formatter: p => `${bj(new Date(p[0].value[0]).toISOString(), 'md')}<br><b>$${num(p[0].value[1])}</b>` },
+        formatter: p => `${bj(new Date(p[0].value[0]).toISOString(), 'md')}<br><b>${SYM()}${num(p[0].value[1], DEC())}</b>` },
       series: [lineS('价格', pts, t.s1, { areaStyle: { color: t.s1, opacity: .08 } })],
     };
   });
@@ -237,14 +285,14 @@ async function loadOverviewPred() {
     $('#predMeta').textContent = `生成于 ${bj(lat.created_at, 'md')} · 模型 v${lat.items[0].model_version}`;
     $('#predCards').innerHTML = lat.items.map(p => {
       const ch = (p.pred_price / p.base_price - 1) * 100;
-      const cny = p.usdcny ? ` ≈ ¥${num(p.pred_price * p.usdcny / OZ, 2)}/克` : '';
+      const r = p.usdcny, t0 = p.created_at;   // 预测记录统一用当时保存的汇率
       const st = p.status === 'evaluated'
-        ? `实际 ${num(p.actual_price)}，误差 ${signed(p.error_usd)}，方向 ${p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'}`
+        ? `实际 ${P(p.actual_price, t0, r)}，误差 ${PD(p.error_usd, t0, r)}，方向 ${p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'}`
         : `到期 ${bj(p.target_time, 'md')}`;
       return `<div class="pred">
         <div class="h"><span>${p.horizon_cn}</span><span class="badge ${DIR_CLS[p.direction]}">${DIR_ICON[p.direction]} ${p.direction}</span></div>
-        <div class="p">$${num(p.pred_price)} <span class="small ${cls(ch)}">${pct(ch)}</span></div>
-        <div class="r">80% 区间 ${num(p.lower)} ~ ${num(p.upper)}${cny}</div>
+        <div class="p">${PS(p.pred_price, t0, r)} <span class="small ${cls(ch)}">${pct(ch)}</span></div>
+        <div class="r">80% 区间 ${P(p.lower, t0, r)} ~ ${P(p.upper, t0, r)} ${UNIT_S()} · ${alt(p.pred_price, t0, r)}</div>
         <div class="prob" title="上涨概率"><i style="width:${(p.prob_up * 100).toFixed(0)}%"></i></div>
         <div class="r">上涨概率 ${(p.prob_up * 100).toFixed(0)}% · ${st}</div>
       </div>`;
@@ -256,23 +304,24 @@ async function loadOverviewPred() {
   const preds = all.items.filter(p => new Date(p.target_time).getTime() >= t0);
   draw('overviewChart', () => {
     const t = T();
-    const price = ch.candles.map(c => [c[0], c[2]]);
+    const price = ch.candles.map(c => [c[0], cv(c[2], c[0])]);
     const done = preds.filter(p => p.status === 'evaluated');
     const pend = preds.filter(p => p.status !== 'evaluated');
-    const pt = p => ({ value: [new Date(p.target_time).getTime(), p.pred_price], p });
+    const pt = p => ({ value: [new Date(p.target_time).getTime(), cv(p.pred_price, p.created_at, p.usdcny)], p });
     return base(t, {
-      xAxis: timeAxis(t), yAxis: valAxis(t),
+      xAxis: timeAxis(t), yAxis: valAxis(t, { name: UNIT_S(), nameTextStyle: { color: t.muted, fontSize: 11 } }),
       dataZoom: [{ type: 'inside' }],
       legend: { ...base(t).legend, data: ['实际价格', '已验证预测', '待验证预测'] },
       tooltip: { ...base(t).tooltip, formatter: ps => ps.map(x => {
-        if (x.seriesName === '实际价格') return `${bj(new Date(x.value[0]).toISOString(), 'md')}<br>实际价格 <b>$${num(x.value[1])}</b>`;
+        if (x.seriesName === '实际价格') return `${bj(new Date(x.value[0]).toISOString(), 'md')}<br>实际价格 <b>${SYM()}${num(x.value[1], DEC())}</b>`;
         const p = x.data.p; if (!p) return '';
-        return `<br>#${p.id} ${p.horizon_cn}预测 <b>$${num(p.pred_price)}</b>（${p.direction}）<br>区间 ${num(p.lower)} ~ ${num(p.upper)}`
-          + (p.status === 'evaluated' ? `<br>实际 ${num(p.actual_price)}，误差 ${signed(p.error_usd)}` : '<br>待验证');
+        const r = p.usdcny, t0 = p.created_at;
+        return `<br>#${p.id} ${p.horizon_cn}预测 <b>${PS(p.pred_price, t0, r)}</b>（${p.direction}）<br>区间 ${P(p.lower, t0, r)} ~ ${P(p.upper, t0, r)}`
+          + (p.status === 'evaluated' ? `<br>实际 ${P(p.actual_price, t0, r)}，误差 ${PD(p.error_usd, t0, r)}` : '<br>待验证');
       }).join('') },
       series: [
         lineS('实际价格', price, t.s1),
-        errBars('区间', preds.map(p => [new Date(p.target_time).getTime(), p.lower, p.upper]), t.s2),
+        errBars('区间', preds.map(p => [new Date(p.target_time).getTime(), cv(p.lower, p.created_at, p.usdcny), cv(p.upper, p.created_at, p.usdcny)]), t.s2),
         { name: '已验证预测', type: 'scatter', data: done.map(pt), symbolSize: 9, itemStyle: { color: t.s2, borderColor: t.surface, borderWidth: 2 } },
         { name: '待验证预测', type: 'scatter', data: pend.map(pt), symbolSize: 9, itemStyle: { color: t.surface, borderColor: t.s2, borderWidth: 2 } },
       ],
@@ -281,10 +330,9 @@ async function loadOverviewPred() {
 }
 
 /* ———————— 走势 ———————— */
-const trend = { range: '1y', type: 'line', unit: 'usd', overlay: '', start: '', end: '' };
+const trend = { range: '1y', type: 'line', overlay: '', start: '', end: '' };
 seg('rangeSeg', v => { trend.range = v; trend.start = trend.end = ''; loadTrend(); });
 seg('typeSeg', v => { trend.type = v; loadTrend(); });
-seg('unitSeg', v => { trend.unit = v; loadTrend(); });
 $('#overlaySel').addEventListener('change', e => { trend.overlay = e.target.value; loadTrend(); });
 $('#cGo').addEventListener('click', () => {
   const s = $('#cStart').value, e = $('#cEnd').value;
@@ -292,21 +340,14 @@ $('#cGo').addEventListener('click', () => {
   trend.start = s; trend.end = e; setSeg('rangeSeg', ''); loadTrend();
 });
 
-function fxAt(fx) {
-  // 返回 t -> 汇率（t 之前最近一个）
-  let i = 0;
-  return t => { while (i + 1 < fx.length && fx[i + 1][0] <= t) i++; return fx.length ? fx[i][1] : null; };
-}
-
 async function loadTrend() {
   const q = new URLSearchParams({ range: trend.range || '1y' });
   if (trend.start) { q.set('start', trend.start); q.set('end', trend.end); }
   if (trend.overlay) q.set('overlay', trend.overlay);
   const d = await api('/api/chart?' + q);
-  const cny = trend.unit === 'cny';
-  const conv = cny ? (() => { const f = fxAt(d.usdcny); return (t, v) => { const r = f(t); return r ? v * r / OZ : null; }; })() : (t, v) => v;
-  const unit = cny ? '¥/克' : '$/盎司';
-  const dec = cny ? 2 : 1;
+  const conv = (t, v) => cv(v, t);
+  const unit = UNIT_S();
+  const dec = DEC();
   const candles = d.candles.map(c => [c[0], conv(c[0], c[1]), conv(c[0], c[2]), conv(c[0], c[3]), conv(c[0], c[4])]);
   const first = candles[0], last = candles[candles.length - 1];
   const change = first && last ? (last[2] / first[2] - 1) * 100 : null;
@@ -338,7 +379,7 @@ async function loadTrend() {
           itemStyle: { color: t.up, color0: t.down, borderColor: t.up, borderColor0: t.down }, barMaxWidth: 10 }
       : lineS('黄金', candles.map(c => [c[0], c[2]]), t.s1, { areaStyle: { color: t.s1, opacity: .06 } });
     return base(t, {
-      xAxis: timeAxis(t), yAxis: valAxis(t),
+      xAxis: timeAxis(t), yAxis: valAxis(t, { name: unit, nameTextStyle: { color: t.muted, fontSize: 11 } }),
       grid: { left: 64, right: 20, top: 30, bottom: 56 },
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 6, borderColor: t.border, textStyle: { color: t.muted } }],
       tooltip: { ...base(t).tooltip, formatter: ps => {
@@ -358,26 +399,30 @@ async function loadTrend() {
 
 async function loadAnalysis() {
   const a = await api('/api/analysis');
-  $('#anaMeta').textContent = `${a.start_date} 至今 · 日线`;
+  $('#anaMeta').textContent = `${a.start_date} 至今 · 日线 · ${UNIT_CN()}`;
+  // 后端分别按 美元/盎司 和 人民币/克 计算了统计（人民币计价的高低点、涨跌、回撤可能落在不同日期）
+  const S = isCny() && a.cny ? a.cny : a;
+  const F = v => SYM() + num(v, DEC());
+  const md = isCny() ? 1 : 0;
   const tiles = [
-    ['最新价', '$' + num(a.last), a.fx ? `≈ ¥${num(a.last * a.fx / OZ, 2)}/克` : ''],
-    ['近一年涨跌', `<span class="${cls(a.year_chg)}">${arrow(a.year_chg)}${pct(a.year_chg, 1)}</span>`, `一年前 $${num(a.start)}`],
-    ['年内最高', '$' + num(a.high), a.high_date],
-    ['年内最低', '$' + num(a.low), a.low_date],
-    ['距高点回撤', pct(a.since_peak, 1), `年内最大回撤 ${pct(a.max_dd, 1)}`],
-    ['年化波动率', num(a.ann_vol, 1) + '%', `RSI(14) ${num(a.rsi, 0)}`],
-    ['均线', a.trend[0], `MA20 ${num(a.ma['20'], 0)} · MA50 ${num(a.ma['50'], 0)} · MA200 ${num(a.ma['200'], 0)}`],
-    ['相对 200 日线', a.trend[1].replace(/价格|200日均线/g, ''), a.trend[2]],
+    ['最新价', F(S.last), alt(a.last, Date.now(), a.fx)],
+    ['近一年涨跌', `<span class="${cls(S.year_chg)}">${arrow(S.year_chg)}${pct(S.year_chg, 1)}</span>`, `一年前 ${F(S.start)}`],
+    ['年内最高', F(S.high), S.high_date],
+    ['年内最低', F(S.low), S.low_date],
+    ['距高点回撤', pct(S.since_peak, 1), `年内最大回撤 ${pct(S.max_dd, 1)}`],
+    ['年化波动率', num(S.ann_vol, 1) + '%', `RSI(14) ${num(S.rsi, 0)}`],
+    ['均线', S.trend[0], `MA20 ${num(S.ma['20'], md)} · MA50 ${num(S.ma['50'], md)} · MA200 ${num(S.ma['200'], md)}`],
+    ['相对 200 日线', S.trend[1].replace(/价格|200日均线/g, ''), S.trend[2]],
   ];
   $('#anaTiles').innerHTML = tiles.map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d muted">${s}</div></div>`).join('');
 
-  const months = a.monthly.filter(m => m.change_pct != null);
+  const months = S.monthly.filter(m => m.change_pct != null);
   draw('monthChart', () => {
     const t = T();
     return base(t, {
       grid: { left: 48, right: 12, top: 16, bottom: 30 },
       tooltip: { ...base(t).tooltip, axisPointer: { type: 'shadow' },
-        formatter: ps => `${ps[0].name}<br>月末收盘 $${num(months[ps[0].dataIndex].close)}<br>月涨跌 ${chg(ps[0].value)}` },
+        formatter: ps => { const m = months[ps[0].dataIndex]; return `${ps[0].name}<br>月末收盘 ${F(m.close)}<br>月涨跌 ${chg(ps[0].value)}`; } },
       xAxis: { type: 'category', data: months.map(m => m.month.slice(2)), axisLine: { lineStyle: { color: t.axis } }, axisTick: { show: false }, axisLabel: { color: t.muted, fontSize: 11 } },
       yAxis: valAxis(t, { scale: false, axisLabel: { color: t.muted, fontSize: 11, formatter: v => v + '%' } }),
       series: [{ type: 'bar', barMaxWidth: 22, data: months.map(m => ({ value: +m.change_pct.toFixed(2), itemStyle: { color: m.change_pct >= 0 ? t.up : t.down, borderRadius: m.change_pct >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4] } })),
@@ -416,6 +461,19 @@ function gotoPeriod(kind, date) {
   $('#qResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// 时段汇总行按所选单位换算：价格用时段末汇率，上期收盘用时段开始时的汇率，涨跌幅/振幅随之重算
+function rowCv(x) {
+  const tEnd = Math.min(toMs(x.end) - 1, Date.now()), tStart = toMs(x.start) - 1;
+  const o = { ...x };
+  for (const k of ['open', 'close', 'high', 'low']) o[k] = cv(x[k], tEnd);
+  o.prev_close = cv(x.prev_close, tStart);
+  o.change = o.prev_close != null && o.close != null ? o.close - o.prev_close : null;
+  o.change_pct = o.prev_close ? (o.close / o.prev_close - 1) * 100 : null;
+  const ref = o.prev_close ?? o.open;
+  o.amplitude_pct = ref ? (o.high - o.low) / ref * 100 : null;
+  return o;
+}
+
 async function runQuery() {
   const date = query.kind === 'month' ? $('#qMonth').value : $('#qDate').value;
   if (!date) return toast('请选择日期');
@@ -427,36 +485,38 @@ async function runQuery() {
     box.innerHTML = `<div class="card"><div class="q-head"><h2>${esc(r.label)}</h2></div><div class="empty">${esc(r.message)}</div></div>`;
     return;
   }
-  const s = r.summary;
+  const s0 = r.summary, s = rowCv(s0);
+  const d = DEC();
   const tFmt = query.kind === 'day' ? 'time' : 'md';
+  const endMs = Math.min(toMs(r.end) - 1, Date.now());
   const tiles = [
-    ['开盘', num(s.open)], ['收盘', num(s.close)],
-    ['最高', num(s.high), bj(s.high_time, tFmt)], ['最低', num(s.low), bj(s.low_time, tFmt)],
-    ['较上期', chg(s.change, 1, ''), `上期收盘 ${num(s.prev_close)}`], ['振幅', num(s.amplitude_pct, 2) + '%'],
-    ['人民币价', s.close_cny_g ? '¥' + num(s.close_cny_g, 2) + '/克' : '—', s.usdcny ? `汇率 ${num(s.usdcny, 4)}` : ''],
+    ['开盘', num(s.open, d)], ['收盘', num(s.close, d)],
+    ['最高', num(s.high, d), bj(s.high_time, tFmt)], ['最低', num(s.low, d), bj(s.low_time, tFmt)],
+    ['较上期', chg(s.change, d, ''), `上期收盘 ${num(s.prev_close, d)}`], ['振幅', num(s.amplitude_pct, 2) + '%'],
+    ['换算', alt(s0.close, endMs) || '—', rateAt(endMs) ? `汇率 ${num(rateAt(endMs), 4)}` : ''],
     ['K线数', s.bars, query.kind === 'day' ? '小时' : ''],
   ];
   const mac = Object.entries(r.macros);
   const bd = r.breakdown;
-  const subTable = (rows, kind, title) => `<div class="card"><div class="card-head"><h3>${title}</h3><span class="muted small">点击行查看明细</span></div><div class="table-wrap"><table class="tbl clickable" data-kind="${kind}">
+  const subTable = (rows, kind, title) => `<div class="card"><div class="card-head"><h3>${title}（${UNIT_S()}）</h3><span class="muted small">点击行查看明细</span></div><div class="table-wrap"><table class="tbl clickable" data-kind="${kind}">
       <thead><tr><th>${kind === 'day' ? '日期' : '周'}</th><th class="r">开盘</th><th class="r">收盘</th><th class="r">最高</th><th class="r">最低</th><th class="r">涨跌</th><th class="r">涨跌幅</th><th class="r">振幅</th></tr></thead>
-      <tbody>${rows.map(x => `<tr data-key="${x.key}"><td>${esc(x.label)}</td><td class="r">${num(x.open)}</td><td class="r"><b>${num(x.close)}</b></td><td class="r">${num(x.high)}</td><td class="r">${num(x.low)}</td><td class="r">${chg(x.change, 1, '')}</td><td class="r">${chg(x.change_pct)}</td><td class="r">${num(x.amplitude_pct, 2)}%</td></tr>`).join('')}</tbody></table></div></div>`;
+      <tbody>${rows.map(rowCv).map(x => `<tr data-key="${x.key}"><td>${esc(x.label)}</td><td class="r">${num(x.open, d)}</td><td class="r"><b>${num(x.close, d)}</b></td><td class="r">${num(x.high, d)}</td><td class="r">${num(x.low, d)}</td><td class="r">${chg(x.change, d, '')}</td><td class="r">${chg(x.change_pct)}</td><td class="r">${num(x.amplitude_pct, 2)}%</td></tr>`).join('')}</tbody></table></div></div>`;
 
   box.innerHTML = `
     <div class="card">
-      <div class="q-head"><h2>${esc(r.label)}</h2><span class="big">$${num(s.close)}</span>${chg(s.change_pct)}</div>
+      <div class="q-head"><h2>${esc(r.label)}</h2><span class="big">${SYM()}${num(s.close, d)}</span>${chg(s.change_pct)}<span class="muted small">${UNIT_CN()}</span></div>
       <div class="tiles">${tiles.map(([k, v, x]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d muted">${x || ''}</div></div>`).join('')}</div>
       <div class="chart" id="qChart" style="height:320px"></div>
     </div>
     ${bd.weeks ? subTable(bd.weeks, 'week', '各周') : ''}
     ${bd.days ? subTable(bd.days, 'day', '每日') : ''}
-    ${bd.hours ? `<div class="card"><div class="card-head"><h3>逐小时</h3></div><div class="table-wrap"><table class="tbl"><thead><tr><th>时间</th><th class="r">开盘</th><th class="r">最高</th><th class="r">最低</th><th class="r">收盘</th><th class="r">涨跌</th></tr></thead><tbody>${bd.hours.map(h => `<tr><td>${bj(h.time, 'time')}</td><td class="r">${num(h.open)}</td><td class="r">${num(h.high)}</td><td class="r">${num(h.low)}</td><td class="r"><b>${num(h.close)}</b></td><td class="r">${chg(h.close - h.open, 1, '')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    ${bd.hours ? `<div class="card"><div class="card-head"><h3>逐小时（${UNIT_S()}）</h3></div><div class="table-wrap"><table class="tbl"><thead><tr><th>时间</th><th class="r">开盘</th><th class="r">最高</th><th class="r">最低</th><th class="r">收盘</th><th class="r">涨跌</th></tr></thead><tbody>${bd.hours.map(h => `<tr><td>${bj(h.time, 'time')}</td><td class="r">${P(h.open, h.time)}</td><td class="r">${P(h.high, h.time)}</td><td class="r">${P(h.low, h.time)}</td><td class="r"><b>${P(h.close, h.time)}</b></td><td class="r">${chg(cv(h.close - h.open, h.time), d, '')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="grid2">
       <div class="card"><div class="card-head"><h3>同期国际因子</h3></div>
         ${mac.length ? `<table class="tbl"><thead><tr><th>因子</th><th class="r">期初</th><th class="r">期末</th><th class="r">变化</th></tr></thead><tbody>${mac.map(([k, m]) => `<tr><td>${m.name}</td><td class="r">${num(m.start, 3)}</td><td class="r">${num(m.end, 3)}</td><td class="r">${k === 'tnx' ? chg(m.change * 100, 0, 'bp') : chg(m.change_pct)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">无数据</div>'}
       </div>
       <div class="card"><div class="card-head"><h3>该时段做出的预测</h3></div>
-        ${r.predictions.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>#</th><th>周期</th><th>时间</th><th class="r">预测</th><th class="r">实际</th><th>方向</th></tr></thead><tbody>${r.predictions.map(p => `<tr><td>${p.id}</td><td>${HCN[p.horizon]}</td><td>${bj(p.base_time, 'md')}</td><td class="r">${num(p.pred_price)}（${p.direction}）</td><td class="r">${p.actual_price ? num(p.actual_price) : '待验证'}</td><td>${p.status === 'evaluated' ? (p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">无</div>'}
+        ${r.predictions.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>#</th><th>周期</th><th>时间</th><th class="r">预测</th><th class="r">实际</th><th>方向</th></tr></thead><tbody>${r.predictions.map(p => `<tr><td>${p.id}</td><td>${HCN[p.horizon]}</td><td>${bj(p.base_time, 'md')}</td><td class="r">${P(p.pred_price, p.base_time, p.usdcny)}（${p.direction}）</td><td class="r">${p.actual_price ? P(p.actual_price, p.base_time, p.usdcny) : '待验证'}</td><td>${p.status === 'evaluated' ? (p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">无</div>'}
       </div>
     </div>`;
   $$('table.clickable[data-kind]', box).forEach(tb => tb.addEventListener('click', e => {
@@ -466,13 +526,15 @@ async function runQuery() {
   draw('qChart', () => {
     const t = T();
     const hourly = r.chart.length > 40 || query.kind === 'day';
+    const kdata = r.chart.map(([ms, o, c, l, h]) => [ms, cv(o, ms), cv(c, ms), cv(l, ms), cv(h, ms)]);
     return base(t, {
-      xAxis: timeAxis(t), yAxis: valAxis(t), grid: { left: 64, right: 20, top: 20, bottom: 30 }, legend: { show: false },
+      xAxis: timeAxis(t), yAxis: valAxis(t, { name: UNIT_S(), nameTextStyle: { color: t.muted, fontSize: 11 } }),
+      grid: { left: 64, right: 20, top: 24, bottom: 30 }, legend: { show: false },
       tooltip: { ...base(t).tooltip, formatter: ps => {
         const [ms, o, c, l, h] = ps[0].value;
-        return `${bj(new Date(ms).toISOString(), 'md')}<br>开 ${num(o)} 收 <b>${num(c)}</b><br>高 ${num(h)} 低 ${num(l)}`;
+        return `${bj(new Date(ms).toISOString(), 'md')}<br>开 ${num(o, d)} 收 <b>${num(c, d)}</b><br>高 ${num(h, d)} 低 ${num(l, d)}`;
       } },
-      series: [{ name: '黄金', type: 'candlestick', data: r.chart, barMaxWidth: hourly ? 8 : 16,
+      series: [{ name: '黄金', type: 'candlestick', data: kdata, barMaxWidth: hourly ? 8 : 16,
         itemStyle: { color: t.up, color0: t.down, borderColor: t.up, borderColor0: t.down } }],
     });
   });
@@ -480,17 +542,24 @@ async function runQuery() {
 
 async function loadList() {
   const d = await api(`/api/periods?kind=${query.listKind}&months=12`);
-  const items = d.items;
+  const items = d.items.map(rowCv);
+  const dd = DEC();
   const lbl = { day: '日期', week: '周', month: '月份' }[query.listKind];
-  $('#listTable').innerHTML = `<thead><tr><th>${lbl}</th><th class="r">开盘</th><th class="r">收盘</th><th class="r">最高</th><th class="r">最低</th><th class="r">涨跌</th><th class="r">涨跌幅</th><th class="r">振幅</th><th class="r">人民币/克</th></tr></thead>
-    <tbody>${items.map(x => `<tr data-key="${x.key}"><td>${esc(x.label)}</td><td class="r">${num(x.open)}</td><td class="r"><b>${num(x.close)}</b></td><td class="r">${num(x.high)}</td><td class="r">${num(x.low)}</td><td class="r">${chg(x.change, 1, '')}</td><td class="r">${chg(x.change_pct)}</td><td class="r">${num(x.amplitude_pct, 2)}%</td><td class="r">${x.close_cny_g ? num(x.close_cny_g, 2) : '—'}</td></tr>`).join('')}</tbody>`;
+  const otherHead = isCny() ? '收盘 $/盎司' : '收盘 ¥/克';
+  const other = (x, raw) => {
+    const t = Math.min(toMs(x.end) - 1, Date.now());
+    if (isCny()) return num(raw.close, 1);
+    const r = rateAt(t); return r ? num(raw.close * r / OZ, 2) : '—';
+  };
+  $('#listTable').innerHTML = `<thead><tr><th>${lbl}</th><th class="r">开盘</th><th class="r">收盘</th><th class="r">最高</th><th class="r">最低</th><th class="r">涨跌</th><th class="r">涨跌幅</th><th class="r">振幅</th><th class="r">${otherHead}</th></tr></thead>
+    <tbody>${items.map((x, i) => `<tr data-key="${x.key}"><td>${esc(x.label)}</td><td class="r">${num(x.open, dd)}</td><td class="r"><b>${num(x.close, dd)}</b></td><td class="r">${num(x.high, dd)}</td><td class="r">${num(x.low, dd)}</td><td class="r">${chg(x.change, dd, '')}</td><td class="r">${chg(x.change_pct)}</td><td class="r">${num(x.amplitude_pct, 2)}%</td><td class="r muted">${other(x, d.items[i])}</td></tr>`).join('')}</tbody>`;
   const chron = [...items].reverse().filter(x => x.change_pct != null);
   draw('listChart', () => {
     const t = T();
     return base(t, {
       grid: { left: 48, right: 12, top: 16, bottom: 30 },
       tooltip: { ...base(t).tooltip, axisPointer: { type: 'shadow' },
-        formatter: ps => { const x = chron[ps[0].dataIndex]; return `${esc(x.label)}<br>收盘 $${num(x.close)}<br>涨跌 ${chg(x.change_pct)}<br><span class="muted">点击查看明细</span>`; } },
+        formatter: ps => { const x = chron[ps[0].dataIndex]; return `${esc(x.label)}<br>收盘 ${SYM()}${num(x.close, DEC())}<br>涨跌 ${chg(x.change_pct)}<br><span class="muted">点击查看明细</span>`; } },
       xAxis: { type: 'category', data: chron.map(x => x.key.slice(query.listKind === 'month' ? 2 : 5, query.listKind === 'month' ? 7 : 10)), axisLine: { lineStyle: { color: t.axis } }, axisTick: { show: false }, axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true } },
       yAxis: valAxis(t, { scale: false, axisLabel: { color: t.muted, fontSize: 11, formatter: v => v + '%' } }),
       series: [{ type: 'bar', barMaxWidth: 18, data: chron.map(x => ({ value: +x.change_pct.toFixed(2), itemStyle: { color: x.change_pct >= 0 ? t.up : t.down, borderRadius: x.change_pct >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] } })) }],
@@ -511,14 +580,16 @@ async function loadForecast() {
   const a = await api('/api/accuracy');
   const m = a.model;
   $('#fcModel').textContent = m ? `模型 v${m.version} · 训练于 ${bj(m.trained_at, 'md')} · 待验证 ${a.pending} 条` : '尚未训练';
+  // 平均误差是多条记录的汇总（美元），人民币显示时按当前汇率折算
+  const E = v => PS(v, Date.now());
   const rows = ['5h', '1d', '7d'].map(h => {
     const s = a.stats[h]; const v = m && m.horizons[h] && m.horizons[h].metrics;
     const rel = s ? (1 - s.mae_usd / s.mae_rw_usd) * 100 : null;
     return `<tr><td>${HCN[h]}</td><td class="r">${s ? s.n : 0}</td><td class="r">${s ? (s.dir_acc * 100).toFixed(0) + '%' : '—'}</td><td class="r">${s ? (s.coverage * 100).toFixed(0) + '%' : '—'}</td>
-      <td class="r">${s ? '$' + num(s.mae_usd) : '—'}</td><td class="r">${s ? '$' + num(s.mae_rw_usd) : '—'}</td><td class="r">${rel == null ? '—' : `<span class="${rel > 0 ? 'ok' : 'bad'}">${signed(rel, 1)}%</span>`}</td>
-      <td class="r muted">${v ? (v.insufficient ? '数据不足' : v.dir_acc == null ? '—' : (v.dir_acc * 100).toFixed(1) + '%') : '—'}</td><td class="r muted">${v ? '$' + num(v.mae_usd) + ' / $' + num(v.mae_rw_usd) : '—'}</td></tr>`;
+      <td class="r">${s ? E(s.mae_usd) : '—'}</td><td class="r">${s ? E(s.mae_rw_usd) : '—'}</td><td class="r">${rel == null ? '—' : `<span class="${rel > 0 ? 'ok' : 'bad'}">${signed(rel, 1)}%</span>`}</td>
+      <td class="r muted">${v ? (v.insufficient ? '数据不足' : v.dir_acc == null ? '—' : (v.dir_acc * 100).toFixed(1) + '%') : '—'}</td><td class="r muted">${v ? E(v.mae_usd) + ' / ' + E(v.mae_rw_usd) : '—'}</td></tr>`;
   });
-  $('#accTable').innerHTML = `<thead><tr><th>周期</th><th class="r">已验证</th><th class="r">方向准确率</th><th class="r">区间覆盖率(目标80%)</th><th class="r">平均误差</th><th class="r">"不变"基准误差</th><th class="r">优于基准</th><th class="r">训练验证集方向</th><th class="r">验证集误差/基准</th></tr></thead><tbody>${rows.join('')}</tbody>`;
+  $('#accTable').innerHTML = `<thead><tr><th>周期</th><th class="r">已验证</th><th class="r">方向准确率</th><th class="r">区间覆盖率(目标80%)</th><th class="r">平均误差（${UNIT_S()}）</th><th class="r">"不变"基准误差</th><th class="r">优于基准</th><th class="r">训练验证集方向</th><th class="r">验证集误差/基准</th></tr></thead><tbody>${rows.join('')}</tbody>`;
   $('#histList').innerHTML = a.history.length ? a.history.map(h => `<div class="hist"><div class="t">v${h.version} · ${h.kind === 'train' ? '训练' : '反馈调整'} · ${bj(h.created_at, 'md')}</div><div class="muted small">${esc(h.note)}</div><ul>${h.changes.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('') : '<div class="empty">暂无</div>';
   loadFcChart(); loadPredTable();
 }
@@ -530,14 +601,15 @@ async function loadFcChart() {
     const t = T();
     if (!ev.length) return { title: { text: '暂无已验证的预测，到期后会自动回测', left: 'center', top: 'middle', textStyle: { color: t.muted, fontSize: 13, fontWeight: 'normal' } } };
     const tt = p => new Date(p.target_time).getTime();
+    const c = (p, v) => cv(v, p.created_at, p.usdcny);
     return base(t, {
-      xAxis: timeAxis(t), yAxis: valAxis(t), dataZoom: [{ type: 'inside' }],
+      xAxis: timeAxis(t), yAxis: valAxis(t, { name: UNIT_S(), nameTextStyle: { color: t.muted, fontSize: 11 } }), dataZoom: [{ type: 'inside' }],
       legend: { ...base(t).legend, data: ['实际价格', '预测价格'] },
-      tooltip: { ...base(t).tooltip, trigger: 'item', formatter: x => { const p = x.data.p; return `#${p.id} ${p.horizon_cn}<br>到期 ${bj(p.target_time, 'md')}<br>预测 <b>${num(p.pred_price)}</b>（${p.direction}）<br>实际 <b>${num(p.actual_price)}</b> 误差 ${signed(p.error_usd)}<br>方向 ${p.direction_hit ? '✓' : '✗'} · 区间 ${p.in_interval ? '✓' : '✗'}`; } },
+      tooltip: { ...base(t).tooltip, trigger: 'item', formatter: x => { const p = x.data.p, r = p.usdcny, t0 = p.created_at; return `#${p.id} ${p.horizon_cn}<br>到期 ${bj(p.target_time, 'md')}<br>预测 <b>${PS(p.pred_price, t0, r)}</b>（${p.direction}）<br>实际 <b>${PS(p.actual_price, t0, r)}</b> 误差 ${PD(p.error_usd, t0, r)}<br>方向 ${p.direction_hit ? '✓' : '✗'} · 区间 ${p.in_interval ? '✓' : '✗'}`; } },
       series: [
-        lineS('实际价格', ev.map(p => ({ value: [tt(p), p.actual_price], p })), t.s1, { showSymbol: true, symbolSize: 5 }),
-        errBars('80%区间', ev.map(p => [tt(p), p.lower, p.upper]), t.s2),
-        { name: '预测价格', type: 'scatter', symbolSize: 8, data: ev.map(p => ({ value: [tt(p), p.pred_price], p })), itemStyle: { color: t.s2, borderColor: t.surface, borderWidth: 2 } },
+        lineS('实际价格', ev.map(p => ({ value: [tt(p), c(p, p.actual_price)], p })), t.s1, { showSymbol: true, symbolSize: 5 }),
+        errBars('80%区间', ev.map(p => [tt(p), c(p, p.lower), c(p, p.upper)]), t.s2),
+        { name: '预测价格', type: 'scatter', symbolSize: 8, data: ev.map(p => ({ value: [tt(p), c(p, p.pred_price)], p })), itemStyle: { color: t.s2, borderColor: t.surface, borderWidth: 2 } },
       ],
     });
   });
@@ -545,12 +617,12 @@ async function loadFcChart() {
 
 async function loadPredTable() {
   const d = await api('/api/predictions?limit=300' + (fc.status ? '&status=' + fc.status : ''));
-  $('#predTable').innerHTML = `<thead><tr><th>#</th><th>周期</th><th>预测时间</th><th class="r">基准价</th><th class="r">预测价</th><th>方向</th><th class="r">上涨概率</th><th class="r">80%区间</th><th>到期</th><th class="r">实际价</th><th class="r">误差</th><th>方向</th><th>区间</th><th>偏差原因</th></tr></thead><tbody>`
-    + d.items.map(p => `<tr><td>${p.id}</td><td>${p.horizon_cn}</td><td>${bj(p.created_at, 'md')}</td><td class="r">${num(p.base_price)}</td><td class="r"><b>${num(p.pred_price)}</b></td>
-      <td><span class="badge ${DIR_CLS[p.direction]}">${DIR_ICON[p.direction]} ${p.direction}</span></td><td class="r">${(p.prob_up * 100).toFixed(0)}%</td><td class="r">${num(p.lower)} ~ ${num(p.upper)}</td><td>${bj(p.target_time, 'md')}</td>
-      <td class="r">${p.actual_price ? num(p.actual_price) : '<span class="muted">待验证</span>'}</td><td class="r">${p.error_usd != null ? signed(p.error_usd) : ''}</td>
+  $('#predTable').innerHTML = `<thead><tr><th>#</th><th>周期</th><th>预测时间</th><th class="r">基准价（${UNIT_S()}）</th><th class="r">预测价</th><th>方向</th><th class="r">上涨概率</th><th class="r">80%区间</th><th>到期</th><th class="r">实际价</th><th class="r">误差</th><th>方向</th><th>区间</th><th>偏差原因</th></tr></thead><tbody>`
+    + d.items.map(p => { const r = p.usdcny, t0 = p.created_at; return `<tr><td>${p.id}</td><td>${p.horizon_cn}</td><td>${bj(p.created_at, 'md')}</td><td class="r">${P(p.base_price, t0, r)}</td><td class="r"><b>${P(p.pred_price, t0, r)}</b></td>
+      <td><span class="badge ${DIR_CLS[p.direction]}">${DIR_ICON[p.direction]} ${p.direction}</span></td><td class="r">${(p.prob_up * 100).toFixed(0)}%</td><td class="r">${P(p.lower, t0, r)} ~ ${P(p.upper, t0, r)}</td><td>${bj(p.target_time, 'md')}</td>
+      <td class="r">${p.actual_price ? P(p.actual_price, t0, r) : '<span class="muted">待验证</span>'}</td><td class="r">${p.error_usd != null ? PD(p.error_usd, t0, r) : ''}</td>
       <td>${p.status === 'evaluated' ? (p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') : ''}</td><td>${p.status === 'evaluated' ? (p.in_interval ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') : ''}</td>
-      <td class="wrap">${(p.reasons || []).map(esc).join('；')}</td></tr>`).join('') + '</tbody>';
+      <td class="wrap">${(p.reasons || []).map(esc).join('；')}</td></tr>`; }).join('') + '</tbody>';
 }
 
 $$('[data-action]').forEach(b => b.addEventListener('click', async () => {
@@ -560,7 +632,7 @@ $$('[data-action]').forEach(b => b.addEventListener('click', async () => {
   try {
     const r = await api('/api/actions/' + name, { method: 'POST' });
     const msg = {
-      predict: () => '已生成新预测：' + r.items.map(i => `${i.horizon_cn} ${num(i.pred_price)}（${i.direction}）`).join('，'),
+      predict: () => '已生成新预测：' + r.items.map(i => `${i.horizon_cn} ${PS(i.pred_price, i.created_at, i.usdcny)}（${i.direction}）`).join('，'),
       evaluate: () => r.evaluated ? `已回测 ${r.evaluated} 条预测` : '没有到期待验证的预测',
       train: () => `模型已重新训练，版本 v${r.version}`,
       refresh: () => r.error ? '刷新出错：' + r.error : `行情已刷新（${r.seconds.toFixed(1)} 秒）`,
@@ -647,7 +719,10 @@ $('#tokenSave').addEventListener('click', () => { store.set('adminToken', $('#to
 
 /* ———————— 启动 ———————— */
 const initial = (location.hash || '#' + store.get('tab', 'overview')).slice(1);
-showTab(loaders[initial] ? initial : 'overview');
-if (initial !== 'overview') loadLatest();
+loadFx().then(() => {   // 先拿到汇率历史，人民币换算才准确
+  showTab(loaders[initial] ? initial : 'overview');
+  if (initial !== 'overview') loadLatest();
+});
+setInterval(loadFx, 30 * 60_000);
 setInterval(loadLatest, 30_000);
 setInterval(() => { if (loaded.system && $('#tab-system').classList.contains('active')) loadSystem(); }, 30_000);

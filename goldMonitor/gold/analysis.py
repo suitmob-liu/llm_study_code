@@ -18,6 +18,32 @@ def _daily_close(daily: dict, name: str) -> pd.Series | None:
     return s[~s.index.duplicated(keep="last")]
 
 
+def _series_stats(s_all: pd.Series, end: pd.Timestamp, last: float) -> dict:
+    """某一计价单位下的近一年统计（美元/盎司 或 人民币/克）。"""
+    s = s_all[s_all.index > end - pd.DateOffset(years=1)]
+    ret = s.pct_change().dropna()
+    ma = {n: float(s_all.rolling(n).mean().iloc[-1]) for n in (20, 50, 200)}
+    rsi = float(_rsi(s_all).iloc[-1])
+    monthly = s.resample("ME").last()
+    mchg = monthly.pct_change() * 100
+    trend = [
+        "多头排列" if ma[20] > ma[50] > ma[200] else ("空头排列" if ma[20] < ma[50] < ma[200] else "均线交织"),
+        f"价格{'高于' if last > ma[200] else '低于'}200日均线（{(last / ma[200] - 1) * 100:+.1f}%）",
+        "RSI 超买" if rsi > 70 else ("RSI 超卖" if rsi < 30 else f"RSI {rsi:.0f} 中性"),
+    ]
+    return {
+        "last": last, "start": float(s.iloc[0]), "start_date": f"{s.index[0]:%Y-%m-%d}",
+        "year_chg": float(s.iloc[-1] / s.iloc[0] - 1) * 100,
+        "high": float(s.max()), "high_date": f"{s.idxmax():%Y-%m-%d}",
+        "low": float(s.min()), "low_date": f"{s.idxmin():%Y-%m-%d}",
+        "since_peak": float(s.iloc[-1] / s.max() - 1) * 100, "max_dd": float((s / s.cummax() - 1).min()) * 100,
+        "ann_vol": float(ret.std() * np.sqrt(252)) * 100,
+        "ma": {str(k): v for k, v in ma.items()}, "rsi": rsi, "trend": trend,
+        "monthly": [{"month": f"{d:%Y-%m}", "close": float(v),
+                     "change_pct": None if pd.isna(mchg.get(d)) else float(mchg.get(d))} for d, v in monthly.items()],
+    }
+
+
 def analyze(daily: dict, hourly: dict, ctx: dict) -> tuple[str, dict]:
     g_all = _daily_close(daily, "gold")
     end = g_all.index[-1]
@@ -54,16 +80,11 @@ def analyze(daily: dict, hourly: dict, ctx: dict) -> tuple[str, dict]:
     trend.append(f"价格{'高于' if last > ma[200] else '低于'}200日均线（{(last / ma[200] - 1) * 100:+.1f}%）")
     trend.append("RSI 超买" if rsi > 70 else ("RSI 超卖" if rsi < 30 else f"RSI {rsi:.0f} 中性"))
 
-    stats = {
-        "last": last, "start": float(g.iloc[0]), "start_date": f"{g.index[0]:%Y-%m-%d}",
-        "year_chg": float(g.iloc[-1] / g.iloc[0] - 1) * 100,
-        "high": float(g.max()), "high_date": f"{hi_d:%Y-%m-%d}", "low": float(g.min()), "low_date": f"{lo_d:%Y-%m-%d}",
-        "since_peak": float(since_peak), "max_dd": float(dd.min()) * 100,
-        "ann_vol": float(ret.std() * np.sqrt(252)) * 100,
-        "ma": {str(k): v for k, v in ma.items()}, "rsi": rsi, "corr": corr, "fx": fx, "trend": trend,
-        "monthly": [{"month": f"{d:%Y-%m}", "close": float(v), "change_pct": None if pd.isna(mchg.get(d)) else float(mchg.get(d))}
-                    for d, v in monthly.items()],
-    }
+    stats = {**_series_stats(g_all, end, last), "corr": corr, "fx": fx}
+    if cny is not None:
+        # 人民币/克 序列：每日金价 × 当日汇率。人民币计价的高低点、涨跌、回撤可能与美元计价不同
+        fxa = cny.reindex(cny.index.union(g_all.index)).ffill().bfill().reindex(g_all.index)
+        stats["cny"] = _series_stats(g_all * fxa / OZ_TO_GRAM, end, last * fx / OZ_TO_GRAM)
 
     L = [f"# 黄金近一年走势分析（{datetime.now():%Y-%m-%d %H:%M}）", ""]
     L += ["## 概览", "",
