@@ -7,11 +7,24 @@
 ## 网页版（Docker 部署到 Linux）
 
 ```bash
-# 把整个目录拷到服务器后
-cp .env.example .env        # 按需修改端口、刷新间隔、管理口令、代理、pip 镜像
-bash deploy.sh              # 等价于 docker compose up -d --build
+git pull                    # 在服务器的 goldMonitor 目录下更新代码
+bash deploy.sh              # 首次运行会自动生成 .env；停旧容器 → 构建 → 启动 → 等健康检查
 # 浏览器打开 http://服务器IP:1012
 ```
+
+`deploy.sh` 的参数：
+
+| 命令 | 作用 |
+|---|---|
+| `bash deploy.sh` | 更新代码后重新部署，数据保留 |
+| `bash deploy.sh --clean` | 删除旧镜像并 `--no-cache` 重建，用于缓存异常时兜底（pip 下载缓存保留） |
+| `bash deploy.sh --purge` | 删除数据卷后重新部署，行情、预测、模型全部清空（需输入 yes 确认，`--yes` 可跳过） |
+| `bash deploy.sh --clean --purge --yes` | 完全从零重新部署 |
+| `bash deploy.sh --mirror http://mirrors.tencentyun.com/pypi/simple` | 临时换 pip 镜像源（http 镜像会自动加 trusted-host） |
+| `bash deploy.sh --port 8080` | 临时换宿主机端口（长期修改请改 `.env` 的 `PORT`） |
+| `bash deploy.sh --no-build` | 不重新构建，直接用现有镜像重启 |
+| `bash deploy.sh --stop` | 停止服务（保留数据和镜像） |
+| `bash deploy.sh --logs` | 部署完成后跟踪日志 |
 
 首次启动会自动下载近两年的行情（约 10~30 秒）并训练模型，之后后台会持续运行：
 
@@ -36,13 +49,12 @@ bash deploy.sh              # 等价于 docker compose up -d --build
 常用运维命令：
 
 ```bash
-docker compose logs -f                                   # 查看日志
-docker compose exec gold python main.py history          # 在容器内使用命令行
-docker compose exec gold python main.py train            # 手动重训
+docker compose -p goldmonitor logs -f                    # 查看日志
+docker exec gold-analyzer python main.py history         # 在容器内使用命令行
+docker exec gold-analyzer python main.py train           # 手动重训
 docker run --rm -v goldmonitor_gold_data:/data -v $PWD:/backup busybox tar czf /backup/gold_backup.tgz -C /data .   # 备份
 ```
 
-> 卷的实际名称是 `<目录名>_gold_data`，可以用 `docker volume ls` 查看。
 > **构建时 pip 下载超时**：在 `.env` 中把 `PIP_INDEX_URL` 换成离服务器最近的镜像（`.env.example` 里列了腾讯云、阿里云的公网和内网地址，云服务器优先用同厂商的内网镜像），然后重新执行 `bash deploy.sh`。构建启用了 pip 缓存，已下载完的包不会重复下载。
 > 如果服务器无法直连 Yahoo Finance，请在 `.env` 中配置 `HTTPS_PROXY`；如果网页对公网开放，建议设置 `ADMIN_TOKEN`，防止他人修改情景或触发训练。
 
