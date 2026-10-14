@@ -98,7 +98,7 @@ def train(feat: pd.DataFrame, cfg: dict, verbose: bool = True) -> dict:
         # 验证集覆盖的独立预测窗口太少（例如新部署只有约 2 个月小时线）时，样本外结论不可信：
         # 不做方向判断（全部权重给“不变”），区间用全部历史的同周期涨跌分布估计
         val_span_h = (Xva.index[-1] - Xva.index[0]).total_seconds() / 3600
-        enough = len(yva) >= 200 and val_span_h >= 30 * hours
+        enough = len(yva) >= 200 and val_span_h >= 20 * hours  # 至少约 20 个不重叠的预测窗口
         if enough:
             weights = _grid_weights(comp_va, yva)
             ens_va = sum(weights[c] * comp_va[c] for c in COMPONENTS)
