@@ -21,8 +21,8 @@ MODEL_PATH = MODEL_DIR / "model.json"
 CHANGELOG_PATH = HISTORY_DIR / "model_changelog.md"
 
 # 预测周期：名称 -> 小时数
-HORIZONS = {"5h": 5, "1d": 24, "7d": 168}
-HORIZON_CN = {"5h": "未来5小时", "1d": "未来1天", "7d": "未来7天"}
+HORIZONS = {"1h": 1, "5h": 5, "1d": 24, "7d": 168}
+HORIZON_CN = {"1h": "未来1小时", "5h": "未来5小时", "1d": "未来1天", "7d": "未来7天"}
 COMPONENTS = ["ridge", "momentum", "meanrev", "randomwalk"]
 COMPONENT_CN = {"ridge": "多因子回归", "momentum": "动量", "meanrev": "均值回归", "randomwalk": "随机游走(不变)"}
 

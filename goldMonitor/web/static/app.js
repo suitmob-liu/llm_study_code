@@ -74,7 +74,8 @@ function macroFmt(k, m, field = 'value') {
 
 const DIR_CLS = { '上涨': 'up', '偏涨': 'up', '下跌': 'down', '偏跌': 'down', '震荡': '' };
 const DIR_ICON = { '上涨': '▲', '偏涨': '↗', '下跌': '▼', '偏跌': '↘', '震荡': '↔' };
-const HCN = { '5h': '未来5小时', '1d': '未来1天', '7d': '未来7天' };
+const HCN = { '1h': '未来1小时', '5h': '未来5小时', '1d': '未来1天', '7d': '未来7天' };
+const HORIZONS = ['1h', '5h', '1d', '7d'];
 
 /* ———————— 价格单位：美元/盎司 ⇄ 人民币/克（按当时汇率） ———————— */
 const UNIT_Q = new URLSearchParams(location.search).get('unit');   // 链接可带 ?unit=cny
@@ -294,21 +295,24 @@ function setLive(state, text) {
   $('span', el).textContent = text;
 }
 
-async function loadOverviewPred() {
+async function loadOverviewPred(fresh = false) {
   const [lat, all, ch] = await Promise.all([
-    api('/api/predictions/latest'), api('/api/predictions?limit=120'), api('/api/chart?range=5d'),
+    api('/api/predictions/latest'), api('/api/predictions?limit=160'), api('/api/chart?range=5d'),
   ]);
+  $('#autoMeta').textContent = lat.auto_interval_hours > 0
+    ? `每 ${lat.auto_interval_hours} 小时自动预测` + (lat.next_auto ? ` · 下次 ${bj(lat.next_auto, 'md')}` : '') + '（休市暂停）'
+    : '自动预测已关闭';
   if (!lat.items.length) {
-    $('#predCards').innerHTML = '<div class="pred muted">暂无预测，系统将在交易时段自动生成，或到“预测与回测”页手动预测。</div>';
+    $('#predCards').innerHTML = '<div class="pred muted">暂无预测，点击右上角“预测下一小时”立即生成，或等待交易时段自动预测。</div>';
   } else {
     $('#predMeta').textContent = `生成于 ${bj(lat.created_at, 'md')} · 模型 v${lat.items[0].model_version}`;
-    $('#predCards').innerHTML = lat.items.map(p => {
+    $('#predCards').innerHTML = lat.items.map((p, i) => {
       const ch = (p.pred_price / p.base_price - 1) * 100;
       const r = p.usdcny, t0 = p.created_at;   // 预测记录统一用当时保存的汇率
       const st = p.status === 'evaluated'
         ? `实际 ${P(p.actual_price, t0, r)}，误差 ${PD(p.error_usd, t0, r)}，方向 ${p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'}`
         : `到期 ${bj(p.target_time, 'md')}`;
-      return `<div class="pred">
+      return `<div class="pred${i === 0 ? ' first' : ''}${fresh ? ' fresh' : ''}">
         <div class="h"><span>${p.horizon_cn}</span><span class="badge ${DIR_CLS[p.direction]}">${DIR_ICON[p.direction]} ${p.direction}</span></div>
         <div class="p">${PS(p.pred_price, t0, r)} <span class="small ${cls(ch)}">${pct(ch)}</span></div>
         <div class="r">80% 区间 ${P(p.lower, t0, r)} ~ ${P(p.upper, t0, r)} ${UNIT_S()} · ${alt(p.pred_price, t0, r)}</div>
@@ -347,6 +351,21 @@ async function loadOverviewPred() {
     });
   });
 }
+
+// 总览：立即预测（下一小时 + 后续 5 小时 / 1 天 / 7 天一起更新）
+$('#predictNowBtn').addEventListener('click', async () => {
+  const b = $('#predictNowBtn'), label = b.textContent;
+  b.disabled = true; b.textContent = '预测中…';
+  try {
+    const r = await api('/api/actions/predict', { method: 'POST' });
+    const h1 = r.items.find(i => i.horizon === '1h') || r.items[0];
+    const ch = (h1.pred_price / h1.base_price - 1) * 100;
+    toast(`下一小时（至 ${bj(h1.target_time, 'time')}）：${PS(h1.pred_price, h1.created_at, h1.usdcny)}（${h1.direction} ${pct(ch)}，上涨概率 ${(h1.prob_up * 100).toFixed(0)}%），其他周期已同步更新`, 6000);
+    await loadOverviewPred(true);
+    if (loaded.forecast) loadForecast();
+  } catch (e) { toast('预测失败：' + e.message, 5000); }
+  b.disabled = false; b.textContent = label;
+});
 
 /* ———————— 走势 ———————— */
 const trend = { range: '1y', type: 'line', overlay: new URLSearchParams(location.search).get('overlay') || '', start: '', end: '' };
@@ -623,7 +642,7 @@ async function loadForecast() {
   $('#fcModel').textContent = m ? `模型 v${m.version} · 训练于 ${bj(m.trained_at, 'md')} · 待验证 ${a.pending} 条` : '尚未训练';
   // 平均误差是多条记录的汇总（美元），人民币显示时按当前汇率折算
   const E = v => PS(v, Date.now());
-  const rows = ['5h', '1d', '7d'].map(h => {
+  const rows = HORIZONS.map(h => {
     const s = a.stats[h]; const v = m && m.horizons[h] && m.horizons[h].metrics;
     const rel = s ? (1 - s.mae_usd / s.mae_rw_usd) * 100 : null;
     return `<tr><td>${HCN[h]}</td><td class="r">${s ? s.n : 0}</td><td class="r">${s ? (s.dir_acc * 100).toFixed(0) + '%' : '—'}</td><td class="r">${s ? (s.coverage * 100).toFixed(0) + '%' : '—'}</td>

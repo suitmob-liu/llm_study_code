@@ -21,8 +21,8 @@ import pandas as pd
 from .config import COMPONENTS, HORIZONS, MODEL_PATH
 from .features import feature_columns, make_target
 
-MOM_FEAT = {"5h": "r5", "1d": "r24", "7d": "r120"}
-MR_FEAT = {"5h": "ma_dev24", "1d": "ma_dev120", "7d": "ma_dev480"}
+MOM_FEAT = {"1h": "r1", "5h": "r5", "1d": "r24", "7d": "r120"}
+MR_FEAT = {"1h": "ma_dev24", "5h": "ma_dev24", "1d": "ma_dev120", "7d": "ma_dev480"}
 
 
 def _ridge(X, y, lam):

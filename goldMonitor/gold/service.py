@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 from . import data, store
-from .config import HORIZON_CN, OZ_TO_GRAM, save_config
+from .config import HORIZON_CN, HORIZONS, OZ_TO_GRAM, save_config
 from .context import context_score, load_context, staleness_days
 from .evaluate import run_feedback
 from .features import build_features
@@ -47,6 +47,9 @@ def get_model(con, cfg, hourly, daily, verbose=True):
         age = datetime.now(timezone.utc) - datetime.fromisoformat(model["trained_at"])
         if age > timedelta(days=RETRAIN_DAYS):
             return train_model(con, cfg, hourly, daily, f"模型已 {age.days} 天未训练，自动重训", verbose)
+        missing = set(HORIZONS) - set(model["horizons"])
+        if missing:  # 新增了预测周期（例如 1 小时），需要重训
+            return train_model(con, cfg, hourly, daily, f"新增预测周期 {', '.join(sorted(missing))}，重新训练", verbose)
         return model, build_features(hourly, daily)
 
 

@@ -41,8 +41,14 @@
     <div class="tiles" id="macroTiles"></div>
 
     <div class="section-head">
-      <h2>最新预测</h2>
-      <span class="muted small" id="predMeta"></span>
+      <div class="head-left">
+        <h2>最新预测</h2>
+        <span class="muted small" id="predMeta"></span>
+      </div>
+      <div class="head-right">
+        <span class="muted small" id="autoMeta"></span>
+        <button class="btn primary" id="predictNowBtn" title="立即生成一组新预测：未来1小时、5小时、1天、7天">⚡ 预测下一小时</button>
+      </div>
     </div>
     <div class="pred-cards" id="predCards"></div>
 
@@ -137,7 +143,7 @@
     <div class="card">
       <div class="card-head">
         <h3>预测价 vs 实际价</h3>
-        <div class="seg small" id="fcHSeg"><button data-v="5h" class="active">5小时</button><button data-v="1d">1天</button><button data-v="7d">7天</button></div>
+        <div class="seg small" id="fcHSeg"><button data-v="1h">1小时</button><button data-v="5h" class="active">5小时</button><button data-v="1d">1天</button><button data-v="7d">7天</button></div>
       </div>
       <div class="chart" id="fcChart" style="height:340px"></div>
     </div>

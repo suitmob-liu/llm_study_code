@@ -111,7 +111,12 @@ footer { max-width: 1280px; margin: 0 auto; padding: 8px 20px 32px; }
 .tile .d { font-size: 12px; margin-top: 2px; }
 
 /* 预测卡片 */
-.pred-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.pred-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.pred.first { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft) inset; }
+.pred.fresh { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: var(--accent-soft); } to { background: var(--surface); } }
+.head-left, .head-right { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.head-right { align-items: center; }
 .pred { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
 .pred .h { display: flex; justify-content: space-between; align-items: center; color: var(--ink-2); font-size: 13px; }
 .pred .p { font-size: 26px; font-weight: 700; margin: 6px 0 2px; }
@@ -193,6 +198,7 @@ ul.events li { padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 
 .toast.show { opacity: 1; transform: translateX(-50%); }
 
 .hero > *, .grid2 > *, .pred-cards > *, .tiles > * { min-width: 0; }
+@media (max-width: 1100px) { .pred-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
   .hero { grid-template-columns: minmax(0, 1fr); }
   .grid2 { grid-template-columns: minmax(0, 1fr); }

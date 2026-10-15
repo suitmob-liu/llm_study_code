@@ -44,7 +44,7 @@ def _event(msg: str):
 
 # ———————————— 后台任务 ————————————
 
-def tick(force_predict: bool = False):
+def tick():
     if STATE["running"]:
         return
     STATE["running"] = True
@@ -60,14 +60,18 @@ def tick(force_predict: bool = False):
             res = service.feedback(con, cfg, hourly, daily)
             if res["done"]:
                 _event(f"回测了 {len(res['done'])} 条到期预测，模型调整 {len([c for c in res['changes'] if '暂不' not in c])} 项")
-        if PREDICT_INTERVAL_HOURS > 0 or force_predict:
-            last = store.get_meta(con, "last_predict")
+        if PREDICT_INTERVAL_HOURS > 0:
+            # 自动预测按固定时间槽排程（每 PREDICT_INTERVAL_HOURS 小时），手动预测不影响节奏
             market_open = (now - hourly["gold"].index[-1].to_pydatetime()) < timedelta(hours=2)
-            due = last is None or now - datetime.fromisoformat(last) >= timedelta(hours=PREDICT_INTERVAL_HOURS)
-            if force_predict or (due and market_open):
+            nxt = next_auto_predict(con)
+            if market_open and (nxt is None or now >= nxt):
+                step = timedelta(hours=PREDICT_INTERVAL_HOURS)
+                # 首次运行或错过整个周期（休市）后，从当前整点重新开始排程
+                slot = nxt if nxt is not None and now - nxt < step else now.replace(minute=0, second=0, microsecond=0)
                 res = service.make_prediction(con, cfg, hourly, daily)
-                _event("已生成新预测：" + "，".join(f"{i['horizon_cn']} {i['pred_price']:.1f}（{i['direction']}）"
-                                                for i in res["items"]))
+                store.set_meta(con, "auto_predict_slot", slot.isoformat())
+                _event("自动预测：" + "，".join(f"{i['horizon_cn']} {i['pred_price']:.1f}（{i['direction']}）"
+                                              for i in res["items"]))
         STATE["last_error"] = None
     except Exception as e:  # noqa: BLE001
         STATE["last_error"] = f"{type(e).__name__}: {e}"
@@ -78,10 +82,36 @@ def tick(force_predict: bool = False):
         con.close()
 
 
+def next_auto_predict(con) -> datetime | None:
+    """下一次自动预测的时间。旧版本只记录了 last_predict，则以它所在整点作为排程起点。"""
+    if PREDICT_INTERVAL_HOURS <= 0:
+        return None
+    slot = store.get_meta(con, "auto_predict_slot")
+    if slot is None:
+        last = store.get_meta(con, "last_predict")
+        if last is None:
+            return None
+        slot = datetime.fromisoformat(last).replace(minute=0, second=0, microsecond=0).isoformat()
+        store.set_meta(con, "auto_predict_slot", slot)
+    return datetime.fromisoformat(slot) + timedelta(hours=PREDICT_INTERVAL_HOURS)
+
+
 def _loop(stop: threading.Event):
     while not stop.is_set():
         tick()
-        stop.wait(REFRESH_MINUTES * 60)
+        wait = REFRESH_MINUTES * 60
+        con = store.connect()
+        try:  # 自动预测时间点早于下次刷新时，提前醒来，保证准点
+            nxt = next_auto_predict(con)
+            if nxt is not None:
+                secs = (nxt - datetime.now(timezone.utc)).total_seconds() + 5
+                if 0 < secs < wait:
+                    wait = secs
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            con.close()
+        stop.wait(wait)
 
 
 @asynccontextmanager
@@ -324,11 +354,17 @@ def predictions(limit: int = Query(300, le=5000), horizon: str | None = None, st
 def predictions_latest():
     con = store.connect()
     try:
+        nxt = next_auto_predict(con)
+        auto = {"next_auto": nxt, "auto_interval_hours": PREDICT_INTERVAL_HOURS}
         r = con.execute("SELECT MAX(created_at) AS t FROM predictions").fetchone()
         if not r["t"]:
-            return ok({"items": []})
-        rows = con.execute("SELECT * FROM predictions WHERE created_at=? ORDER BY hours", (r["t"],)).fetchall()
-        return ok({"created_at": r["t"], "items": [_row(x) for x in rows]})
+            return ok({"items": [], **auto})
+        rows = con.execute("SELECT * FROM predictions WHERE created_at=? ORDER BY id DESC", (r["t"],)).fetchall()
+        latest = {}
+        for x in rows:  # 同一秒内若生成了多组（自动+手动），每个周期只取最新一条
+            latest.setdefault(x["horizon"], x)
+        items = sorted(latest.values(), key=lambda x: x["hours"])
+        return ok({"created_at": r["t"], "items": [_row(x) for x in items], **auto})
     finally:
         con.close()
 
@@ -400,7 +436,8 @@ def action(name: str, x_admin_token: str | None = Header(None)):
         cfg = load_config()
         if name == "predict":
             res = service.make_prediction(con, cfg, hourly, daily)
-            _event("手动生成预测")
+            _event("手动预测：" + "，".join(f"{i['horizon_cn']} {i['pred_price']:.1f}（{i['direction']}）"
+                                          for i in res["items"]))
             return ok({"ok": True, **res})
         if name == "evaluate":
             res = service.feedback(con, cfg, hourly, daily)
@@ -425,7 +462,8 @@ def status():
         return ok({"state": STATE, "refresh_minutes": REFRESH_MINUTES,
                    "predict_interval_hours": PREDICT_INTERVAL_HOURS, "auth_required": bool(ADMIN_TOKEN),
                    "last_refresh": store.get_meta(con, "last_refresh"),
-                   "last_predict": store.get_meta(con, "last_predict"), "prices": cnt})
+                   "last_predict": store.get_meta(con, "last_predict"), "next_auto_predict": next_auto_predict(con),
+                   "prices": cnt})
     finally:
         con.close()
 
