@@ -53,6 +53,25 @@ function bj(iso, fmt = 'full') {
 }
 const todayBJ = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 
+// 国际因子：显示格式与说明
+const MACRO_NAMES = { dxy: '美元指数', tnx: '10年美债收益率', real10: '10年实际利率', bei10: '10年通胀预期', silver: '白银',
+  oil: 'WTI原油', vix: 'VIX', spx: '标普500', cot: 'CFTC基金净多头', usdcny: '美元/人民币' };
+const MACRO_TIP = {
+  dxy: '美元走强通常压制金价', tnx: '名义利率上行提高持有黄金的机会成本',
+  real10: '10年期TIPS收益率，即扣除通胀后的真实利率，与金价反向关系最强',
+  bei10: '名义收益率减实际收益率，市场隐含的未来10年通胀预期', vix: '恐慌指数，避险情绪',
+  spx: '风险偏好；股市大跌时常有资金流入黄金', silver: '贵金属板块联动', oil: '通胀与地缘风险',
+  cot: 'CFTC 持仓报告中基金经理（对冲基金/CTA）在 COMEX 黄金的净多头，过高代表拥挤、易回调', usdcny: '人民币金价折算',
+};
+function macroFmt(k, m, field = 'value') {
+  const v = m[field] ?? m.value;
+  if (['tnx', 'real10', 'bei10'].includes(k)) return [num(v, 2) + '%', chg(m.change * 100, 0, 'bp')];
+  if (k === 'cot') return [num(v / 1e4, 2) + '万手', chg(m.change / 1e4, 2, '万手')];
+  if (k === 'usdcny') return [num(v, 4), chg(m.change_pct)];
+  if (k === 'spx') return [num(v, 0), chg(m.change_pct)];
+  return [num(v, 2), chg(m.change_pct)];
+}
+
 const DIR_CLS = { '上涨': 'up', '偏涨': 'up', '下跌': 'down', '偏跌': 'down', '震荡': '' };
 const DIR_ICON = { '上涨': '▲', '偏涨': '↗', '下跌': '▼', '偏跌': '↘', '震荡': '↔' };
 const HCN = { '5h': '未来5小时', '1d': '未来1天', '7d': '未来7天' };
@@ -240,12 +259,12 @@ async function loadLatest() {
   ].join('');
   document.title = `${PS(d.price, d.time, r0)} · 黄金走势分析`;
 
-  const order = ['dxy', 'tnx', 'vix', 'silver', 'oil', 'usdcny'];
+  const order = ['dxy', 'real10', 'tnx', 'bei10', 'vix', 'spx', 'silver', 'oil', 'cot', 'usdcny'];
   $('#macroTiles').innerHTML = order.filter(k => d.macros[k]).map(k => {
     const m = d.macros[k];
-    const dec = k === 'usdcny' ? 4 : k === 'tnx' ? 3 : 2;
-    const delta = k === 'tnx' ? `${chg(m.change * 100, 1, 'bp')}` : chg(m.change_pct);
-    return `<div class="tile"><div class="k">${m.name}</div><div class="v">${num(m.value, dec)}${k === 'tnx' ? '%' : ''}</div><div class="d">${delta} <span class="muted">24h</span></div></div>`;
+    const [v, delta] = macroFmt(k, m);
+    const when = k === 'cot' ? '较上周' : m.interval === '1h' ? '24h' : '较前日';
+    return `<div class="tile" title="${esc(MACRO_TIP[k] || '')}"><div class="k">${m.name}</div><div class="v">${v}</div><div class="d">${delta} <span class="muted">${when}</span></div></div>`;
   }).join('');
 
   draw('spark', () => {
@@ -330,7 +349,8 @@ async function loadOverviewPred() {
 }
 
 /* ———————— 走势 ———————— */
-const trend = { range: '1y', type: 'line', overlay: '', start: '', end: '' };
+const trend = { range: '1y', type: 'line', overlay: new URLSearchParams(location.search).get('overlay') || '', start: '', end: '' };
+$('#overlaySel').value = trend.overlay;
 seg('rangeSeg', v => { trend.range = v; trend.start = trend.end = ''; loadTrend(); });
 seg('typeSeg', v => { trend.type = v; loadTrend(); });
 $('#overlaySel').addEventListener('change', e => { trend.overlay = e.target.value; loadTrend(); });
@@ -354,11 +374,32 @@ async function loadTrend() {
   const hi = Math.max(...candles.map(c => c[4])), lo = Math.min(...candles.map(c => c[3]));
   $('#trendTitle').innerHTML = `黄金走势（${unit}）&nbsp; ${chg(change)}`;
   $('#trendNote').textContent = (d.interval === '1h' ? '小时线' : '日线') + ` · 区间最高 ${num(hi, dec)} / 最低 ${num(lo, dec)}`
-    + (trend.overlay ? ' · 对比模式：两条线都以起点 = 100 归一化' : '');
+    + (!trend.overlay ? '' : ['tnx', 'real10', 'bei10', 'cot'].includes(trend.overlay)
+      ? ' · 对比指标显示在下方小图' : ' · 对比模式：两条线都以起点 = 100 归一化');
 
   draw('trendChart', () => {
     const t = T();
     const fmtT = ms => bj(new Date(ms).toISOString(), d.interval === '1h' ? 'md' : 'date');
+    const LEVEL = ['tnx', 'real10', 'bei10', 'cot'];   // 利率/持仓：不能归一化，画在下方独立小图
+    if (trend.overlay && LEVEL.includes(trend.overlay) && d.overlay && d.overlay.data.length && candles.length) {
+      const k = trend.overlay, isCot = k === 'cot';
+      const od = d.overlay.data.map(x => [x[0], isCot ? x[1] / 1e4 : x[1]]);
+      const oFmt = v => isCot ? num(v, 2) + '万手' : num(v, 2) + '%';
+      const zoom = { xAxisIndex: [0, 1] };
+      return base(t, {
+        grid: [{ left: 64, right: 20, top: 30, height: '52%' }, { left: 64, right: 20, top: '70%', bottom: 56 }],
+        xAxis: [timeAxis(t, { axisLabel: { show: false } }), timeAxis(t, { gridIndex: 1 })],
+        yAxis: [valAxis(t, { name: unit, nameTextStyle: { color: t.muted, fontSize: 11 } }),
+                valAxis(t, { gridIndex: 1, splitNumber: 3, name: d.overlay.name, nameTextStyle: { color: t.muted, fontSize: 11 },
+                             axisLabel: { color: t.muted, fontSize: 11, formatter: v => isCot ? v + '万' : v + '%' } })],
+        axisPointer: { link: [{ xAxisIndex: 'all' }] },
+        dataZoom: [{ type: 'inside', ...zoom }, { type: 'slider', height: 18, bottom: 6, borderColor: t.border, textStyle: { color: t.muted }, ...zoom }],
+        tooltip: { ...base(t).tooltip, formatter: ps => fmtT(ps[0].value[0]) + ps.map(p =>
+          `<br>${p.marker}${p.seriesName} <b>${p.seriesIndex === 0 ? num(p.value[1], dec) : oFmt(p.value[1])}</b>`).join('') },
+        series: [lineS('黄金', candles.map(c => [c[0], c[2]]), t.s1),
+                 lineS(d.overlay.name, od, t.s2, { xAxisIndex: 1, yAxisIndex: 1, step: isCot ? 'end' : false })],
+      });
+    }
     if (trend.overlay && d.overlay && d.overlay.data.length && candles.length) {
       const g0 = candles[0][2], o0 = d.overlay.data[0][1];
       const gIdx = candles.map(c => [c[0], c[2] / g0 * 100]);
@@ -430,10 +471,10 @@ async function loadAnalysis() {
     });
   });
 
-  const tips = { dxy: '美元走强通常压制金价', tnx: '实际利率/机会成本', silver: '贵金属联动', oil: '通胀交易', vix: '避险情绪' };
-  const names = { dxy: '美元指数', tnx: '10年美债收益率', silver: '白银', oil: 'WTI原油', vix: 'VIX' };
+  const tips = { dxy: '美元走强通常压制金价', tnx: '名义利率', real10: '实际利率（机会成本）', bei10: '通胀预期',
+    silver: '贵金属联动', oil: '通胀交易', vix: '避险情绪', spx: '风险偏好', cot: '投机仓位（周度）' };
   $('#corrTable').innerHTML = '<thead><tr><th>因子</th><th class="r">相关系数</th><th>含义</th></tr></thead><tbody>'
-    + Object.entries(a.corr).map(([k, v]) => `<tr><td>${names[k]}</td><td class="r"><b>${signed(v, 2)}</b></td><td class="muted">${tips[k]}</td></tr>`).join('') + '</tbody>';
+    + Object.entries(a.corr).map(([k, v]) => `<tr title="${esc(MACRO_TIP[k] || '')}"><td>${MACRO_NAMES[k] || k}</td><td class="r"><b>${signed(v, 2)}</b></td><td class="muted">${tips[k] || ''}</td></tr>`).join('') + '</tbody>';
 }
 
 /* ———————— 历史查询 ———————— */
@@ -513,7 +554,7 @@ async function runQuery() {
     ${bd.hours ? `<div class="card"><div class="card-head"><h3>逐小时（${UNIT_S()}）</h3></div><div class="table-wrap"><table class="tbl"><thead><tr><th>时间</th><th class="r">开盘</th><th class="r">最高</th><th class="r">最低</th><th class="r">收盘</th><th class="r">涨跌</th></tr></thead><tbody>${bd.hours.map(h => `<tr><td>${bj(h.time, 'time')}</td><td class="r">${P(h.open, h.time)}</td><td class="r">${P(h.high, h.time)}</td><td class="r">${P(h.low, h.time)}</td><td class="r"><b>${P(h.close, h.time)}</b></td><td class="r">${chg(cv(h.close - h.open, h.time), d, '')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="grid2">
       <div class="card"><div class="card-head"><h3>同期国际因子</h3></div>
-        ${mac.length ? `<table class="tbl"><thead><tr><th>因子</th><th class="r">期初</th><th class="r">期末</th><th class="r">变化</th></tr></thead><tbody>${mac.map(([k, m]) => `<tr><td>${m.name}</td><td class="r">${num(m.start, 3)}</td><td class="r">${num(m.end, 3)}</td><td class="r">${k === 'tnx' ? chg(m.change * 100, 0, 'bp') : chg(m.change_pct)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">无数据</div>'}
+        ${mac.length ? `<table class="tbl"><thead><tr><th>因子</th><th class="r">期初</th><th class="r">期末</th><th class="r">变化</th></tr></thead><tbody>${mac.map(([k, m]) => `<tr title="${esc(MACRO_TIP[k] || '')}"><td>${MACRO_NAMES[k] || m.name}</td><td class="r">${macroFmt(k, m, 'start')[0]}</td><td class="r">${macroFmt(k, m, 'end')[0]}</td><td class="r">${macroFmt(k, m)[1]}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">无数据</div>'}
       </div>
       <div class="card"><div class="card-head"><h3>该时段做出的预测</h3></div>
         ${r.predictions.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>#</th><th>周期</th><th>时间</th><th class="r">预测</th><th class="r">实际</th><th>方向</th></tr></thead><tbody>${r.predictions.map(p => `<tr><td>${p.id}</td><td>${HCN[p.horizon]}</td><td>${bj(p.base_time, 'md')}</td><td class="r">${P(p.pred_price, p.base_time, p.usdcny)}（${p.direction}）</td><td class="r">${p.actual_price ? P(p.actual_price, p.base_time, p.usdcny) : '待验证'}</td><td>${p.status === 'evaluated' ? (p.direction_hit ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">无</div>'}
@@ -668,7 +709,7 @@ function renderContext() {
       <input type="text" data-f="name" value="${esc(f.name)}" placeholder="因子名称">
       <div class="impact">${IMPACTS.map(([v, l, c]) => `<button data-v="${v}" class="${c} ${f.impact === v ? 'sel' : ''}">${l}</button>`).join('')}</div>
       <label class="field">权重 <input type="number" data-f="weight" value="${f.weight}" min="0" max="5" step="0.1" style="width:58px"></label>
-      <textarea data-f="note" rows="1" placeholder="依据 / 说明">${esc(f.note || '')}</textarea>
+      <textarea data-f="note" rows="2" placeholder="依据 / 说明">${esc(f.note || '')}</textarea>
       <button class="del" title="删除">×</button></div>`).join('');
   $('#ctxEvents').innerHTML = (ctx.upcoming_events || []).map(e => `<li>${esc(e)}</li>`).join('') || '<li class="muted">无</li>';
   $('#ctxSources').innerHTML = (ctx.sources || []).map(u => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a></li>`).join('') || '<li class="muted">无</li>';
@@ -707,7 +748,7 @@ async function loadSystem() {
   ];
   $('#sysTable').innerHTML = '<tbody>' + rows.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${v}</td></tr>`).join('') + '</tbody>';
   $('#sysEvents').innerHTML = st.last_events.map(e => `<li><span class="muted">${bj(e.at, 'md')}</span> ${esc(e.msg)}</li>`).join('') || '<li class="muted">暂无</li>';
-  const names = { gold: '黄金', dxy: '美元指数', tnx: '10年美债', silver: '白银', oil: '原油', vix: 'VIX', usdcny: '美元/人民币' };
+  const names = { gold: '黄金', ...MACRO_NAMES };
   $('#dataTable').innerHTML = '<thead><tr><th>品种</th><th>周期</th><th class="r">条数</th><th>最早</th><th>最新</th><th>最近刷新 / 来源</th></tr></thead><tbody>'
     + Object.entries(s.prices).map(([k, v]) => {
       const [sym, iv] = k.split('_'); const rs = lr && lr.status[k];

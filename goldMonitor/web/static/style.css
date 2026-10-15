@@ -169,7 +169,7 @@ input, select {
 .factors { display: grid; gap: 10px; }
 .factor { display: grid; grid-template-columns: 180px 220px 90px 1fr 28px; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
 .factor input[type=text], .factor textarea { width: 100%; }
-.factor textarea { font: inherit; font-size: 13px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; resize: vertical; min-height: 34px; }
+.factor textarea { font: inherit; font-size: 13px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; resize: vertical; min-height: 52px; line-height: 1.45; }
 .impact { display: flex; gap: 2px; }
 .impact button { flex: 1; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); padding: 4px 0; font-size: 12px; cursor: pointer; border-radius: 6px; }
 .impact button.sel.n { background: rgba(11,138,11,.15); color: var(--down); border-color: var(--down); font-weight: 600; }

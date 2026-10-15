@@ -12,7 +12,7 @@ from .config import OZ_TO_GRAM
 
 BJ = "Asia/Shanghai"
 KINDS = ("day", "week", "month")
-MACROS = ("dxy", "tnx", "silver", "oil", "vix")
+MACROS = ("dxy", "tnx", "real10", "bei10", "silver", "oil", "spx", "vix", "cot")
 
 
 def bounds(kind: str, d: date) -> tuple[pd.Timestamp, pd.Timestamp, str]:

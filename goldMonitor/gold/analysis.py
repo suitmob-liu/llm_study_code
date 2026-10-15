@@ -60,16 +60,24 @@ def analyze(daily: dict, hourly: dict, ctx: dict) -> tuple[str, dict]:
     monthly = g.resample("ME").last()
     mchg = monthly.pct_change() * 100
 
-    # 与国际因子的相关性（日度变化）
+    # 与国际因子的相关性（日度变化；CFTC 持仓为周度数据，按周计算）
     corr = {}
-    for name in ("dxy", "tnx", "silver", "oil", "vix"):
+    for name in ("real10", "dxy", "tnx", "bei10", "silver", "oil", "spx", "vix", "cot"):
         s = _daily_close(daily, name)
         if s is None:
             continue
-        df = pd.concat([g, s], axis=1, keys=["g", "x"]).dropna()
+        df = pd.concat([g, s], axis=1, keys=["g", "x"])
+        if name == "cot":
+            df = df.ffill().resample("W-FRI").last().dropna()
+        else:
+            df = df.dropna()
+        if len(df) < 10:
+            continue
         gx = np.log(df["g"]).diff()
-        xx = df["x"].diff() if name == "tnx" else np.log(df["x"]).diff()
-        corr[name] = float(gx.corr(xx))
+        xx = df["x"].diff() if name in ("tnx", "real10", "bei10", "cot") else np.log(df["x"]).diff()
+        c = gx.corr(xx)
+        if pd.notna(c):
+            corr[name] = float(c)
 
     # 分阶段
     peak_ret = (g.max() / g.iloc[0] - 1) * 100
@@ -100,8 +108,10 @@ def analyze(daily: dict, hourly: dict, ctx: dict) -> tuple[str, dict]:
         c = mchg.get(d)
         L.append(f"| {d:%Y-%m} | {v:,.1f} | {'' if pd.isna(c) else f'{c:+.1f}%'} |")
     L += ["", "## 与国际因子的日度相关性（近一年）", "", "| 因子 | 相关系数 | 解读 |", "|---|---|---|"]
-    tips = {"dxy": "负相关越强，美元对金价压制越明显", "tnx": "负相关代表实际利率/机会成本逻辑有效",
-            "silver": "贵金属板块联动", "oil": "通胀交易联动", "vix": "正相关代表避险属性在发挥作用"}
+    tips = {"dxy": "负相关越强，美元对金价压制越明显", "tnx": "名义利率上行压制金价",
+            "real10": "负相关越强，实际利率（机会成本）逻辑越主导", "bei10": "正相关代表抗通胀需求在发挥作用",
+            "silver": "贵金属板块联动", "oil": "通胀交易联动", "vix": "正相关代表避险属性在发挥作用",
+            "spx": "负相关代表避险资金在股金之间轮动", "cot": "周度：正相关代表投机资金推动行情"}
     for k, v in corr.items():
         L.append(f"| {NAMES_CN[k]} | {v:+.2f} | {tips[k]} |")
     L += ["", "## 国际基本面情景", "", "```", describe(ctx), "```", ""]

@@ -158,8 +158,8 @@ def latest():
         fxd = data.read(con, "usdcny", "1d", start=pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=15))
         fx = float(fxd["close"].iloc[-1]) if not fxd.empty else None
         macros = {}
-        for m in ("dxy", "tnx", "vix", "silver", "oil", "usdcny"):
-            since = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=10)
+        for m in ("dxy", "tnx", "real10", "bei10", "vix", "spx", "silver", "oil", "cot", "usdcny"):
+            since = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=25 if m == "cot" else 10)
             dh = data.read(con, m, "1h", start=since) if m in data.HOURLY else pd.DataFrame()
             dd = data.read(con, m, "1d", start=since)
             # 用更新的那个（备用源下美债、VIX 只有日线）
@@ -170,7 +170,7 @@ def latest():
             v, t = float(df["close"].iloc[-1]), df.index[-1]
             ref = data.asof(df, t - pd.Timedelta(hours=24)) if iv == "1h" else (
                 float(df["close"].iloc[-2]) if len(df) > 1 else None)
-            macros[m] = {"name": data.NAMES_CN[m], "value": v, "time": t,
+            macros[m] = {"name": data.NAMES_CN[m], "value": v, "time": t, "interval": iv,
                          "change": None if ref is None else v - ref,
                          "change_pct": None if not ref else (v / ref - 1) * 100}
         spark = g.iloc[-48:]
@@ -196,7 +196,7 @@ RANGES = {"1d": (1, "1h"), "5d": (5, "1h"), "1m": (31, "1h"), "3m": (92, "1d"), 
 @app.get("/api/chart")
 def chart(range: str = "1y", symbol: str = "gold", overlay: str | None = None,
           start: str | None = None, end: str | None = None):
-    if range not in RANGES or symbol not in data.SYMBOLS:
+    if range not in RANGES or symbol not in data.ALL_NAMES:
         raise HTTPException(400, "参数错误")
     days, interval = RANGES[range]
     now = pd.Timestamp.now(tz="UTC")
@@ -229,7 +229,7 @@ def chart(range: str = "1y", symbol: str = "gold", overlay: str | None = None,
                "volume": [[t, v] for t, v in zip(ms, df["volume"].fillna(0))],
                "ma": {k: [[t, v] for t, v in zip(ms, s) if not np.isnan(v)] for k, s in ma.items()},
                "overlay": None}
-        if overlay and overlay in data.SYMBOLS and overlay != symbol:
+        if overlay and overlay in data.ALL_NAMES and overlay != symbol:
             oiv = interval if overlay in data.HOURLY else "1d"
             od = data.read(con, overlay, oiv, start=df.index[0], end=t1)
             if oiv == "1h" and (od.empty or od.index[-1] < df.index[-1] - pd.Timedelta(days=3)):

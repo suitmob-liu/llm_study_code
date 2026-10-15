@@ -62,6 +62,19 @@ def build_features(hourly: dict, daily: dict) -> pd.DataFrame:
         f["vix_lvl"] = np.log(vix) - np.log(vix).rolling(480).mean()
         f["vix_d24"] = np.log(vix).diff(24)
 
+    # —— 扩展因子（日/周数据，已在 data.load 中按公布时间对齐到小时轴） ——
+    real, bei, spx, cot = (ext(n) for n in ("real10", "bei10", "spx", "cot"))
+    if real is not None:  # 实际利率：持有黄金的真实机会成本
+        f["real_d120"] = real.diff(120)
+        f["real_lvl"] = real - real.rolling(2000, min_periods=480).mean()
+    if bei is not None:  # 通胀预期
+        f["bei_d120"] = bei.diff(120)
+    if spx is not None:  # 风险偏好
+        f["spx_r120"] = np.log(spx).diff(120)
+    if cot is not None:  # 投机仓位拥挤度（相对近期均值的标准分）
+        roll = cot.rolling(3000, min_periods=480)
+        f["cot_z"] = (cot - roll.mean()) / roll.std()
+
     return f.replace([np.inf, -np.inf], np.nan)
 
 

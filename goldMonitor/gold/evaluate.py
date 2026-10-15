@@ -53,6 +53,17 @@ def attribute(p: dict, actual_ret: float, hourly: dict, daily: dict) -> list[str
     oil = _pct(asof(hourly.get("oil"), t1), asof(hourly.get("oil"), t0))
     if oil is not None and abs(oil) >= 3:
         reasons.append(f"原油变动 {oil:+.1f}%，影响通胀预期")
+    r0, r1 = asof(hourly.get("real10"), t0), asof(hourly.get("real10"), t1)
+    if r0 is not None and r1 is not None and abs(r1 - r0) >= 0.05:
+        bp = (r1 - r0) * 100
+        reasons.append(f"10年实际利率{'上行' if bp > 0 else '下行'} {bp:+.0f}bp（实际利率与金价通常反向）"
+                       + ("，与金价走势一致" if (bp > 0) != up else "，但金价未按此反应"))
+    b0, b1 = asof(hourly.get("bei10"), t0), asof(hourly.get("bei10"), t1)
+    if b0 is not None and b1 is not None and abs(b1 - b0) >= 0.05:
+        reasons.append(f"通胀预期变动 {(b1 - b0) * 100:+.0f}bp")
+    spx = _pct(asof(hourly.get("spx"), t1), asof(hourly.get("spx"), t0))
+    if spx is not None and abs(spx) >= 2:
+        reasons.append(f"标普500 {'大涨' if spx > 0 else '大跌'} {spx:+.1f}%，风险偏好{'上升' if spx > 0 else '下降'}")
 
     # 分量层面
     if not hit and p["direction"] == "震荡":

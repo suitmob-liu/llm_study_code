@@ -34,10 +34,14 @@ SYMBOLS = {
     "vix": "^VIX",  # 恐慌指数
     "usdcny": "CNY=X",  # 美元兑人民币
 }
+# 扩展因子：只有日/周数据，始终从官方来源获取（美国财政部 / CBOE / CFTC），与 DATA_SOURCE 无关
+AUX = ["real10", "bei10", "spx", "cot"]
 NAMES_CN = {
     "gold": "黄金期货", "dxy": "美元指数", "tnx": "10年美债收益率", "silver": "白银",
     "oil": "WTI原油", "vix": "VIX恐慌指数", "usdcny": "美元/人民币",
+    "real10": "10年实际利率(TIPS)", "bei10": "10年通胀预期", "spx": "标普500", "cot": "CFTC基金净多头",
 }
+ALL_NAMES = list(SYMBOLS) + AUX
 HOURLY = ["gold", "dxy", "tnx", "silver", "oil", "vix"]
 COLS = ["open", "high", "low", "close", "volume"]
 
@@ -134,7 +138,7 @@ def refresh(con=None, full: bool | None = None, verbose: bool = False) -> dict:
     con = con or store.connect()
     _migrate_csv(con)
     keys, is_full = [], {}
-    for name in SYMBOLS:
+    for name in ALL_NAMES:
         for interval in ("1h", "1d"):
             if interval == "1h" and name not in HOURLY:
                 continue
@@ -147,6 +151,8 @@ def refresh(con=None, full: bool | None = None, verbose: bool = False) -> dict:
     if use_yahoo:
         jobs = {}
         for name, interval in keys:
+            if name in AUX:
+                continue
             f = is_full[(name, interval)]
             rng = ("730d" if interval == "1h" else "2y") if f else ("5d" if interval == "1h" else "1mo")
             jobs[(name, interval)] = (SYMBOLS[name], rng, interval)
@@ -160,19 +166,19 @@ def refresh(con=None, full: bool | None = None, verbose: bool = False) -> dict:
             log.warning("Yahoo 不可用（%s），切换备用源，%d 小时后再尝试 Yahoo",
                         errors[("gold", "1h")], YAHOO_RETRY_SECONDS // 3600)
 
+    # 备用源 / 官方来源：DATA_SOURCE=yahoo 时只用于扩展因子
     skipped = {}
-    if DATA_SOURCE != "yahoo":
-        pending = [k for k in keys if k not in results]
-        jobs = {k: (k[0], k[1], is_full[k]) for k in pending if k[1] in sources.SUPPORTED.get(k[0], ())}
-        for k in pending:
-            if k not in jobs:
-                skipped[k] = "备用源只有日线，小时数据由日线补齐"
-        for k, v in _parallel(sources.fetch, jobs).items():
-            if isinstance(v, Exception):
-                errors[k] = f"{errors[k]}；备用源：{v}" if k in errors else f"备用源：{v}"
-            else:
-                results[k] = (v, sources.SOURCE_NAME.get(k[0], "备用源"))
-                errors.pop(k, None)
+    pending = [k for k in keys if k not in results and (DATA_SOURCE != "yahoo" or k[0] in AUX)]
+    jobs = {k: (k[0], k[1], is_full[k]) for k in pending if k[1] in sources.SUPPORTED.get(k[0], ())}
+    for k in pending:
+        if k not in jobs:
+            skipped[k] = "备用源只有日线，小时数据由日线补齐"
+    for k, v in _parallel(sources.fetch, jobs).items():
+        if isinstance(v, Exception):
+            errors[k] = f"{errors[k]}；备用源：{v}" if k in errors else f"备用源：{v}"
+        else:
+            results[k] = (v, sources.SOURCE_NAME.get(k[0], "备用源"))
+            errors.pop(k, None)
 
     status = {}
     for name, interval in keys:
@@ -225,13 +231,13 @@ def load(refresh_data: bool = True, verbose: bool = True, con=None) -> tuple[dic
     else:
         _migrate_csv(con)
     hourly, daily = {}, {}
-    for name in SYMBOLS:
+    for name in ALL_NAMES:
         df = read(con, name, "1d")
         if not df.empty:
             daily[name] = df
-        if name in HOURLY:
-            h = read(con, name, "1h")
-            if name != "gold":  # 外部因子：小时线断档（备用源只有日线）时用日线补齐
+        if name in HOURLY or name in AUX:
+            h = read(con, name, "1h") if name in HOURLY else pd.DataFrame()
+            if name != "gold":  # 外部因子：小时线断档（或只有日/周数据）时用日线补齐
                 h = _extend_with_daily(h if not h.empty else None, daily.get(name))
             if h is not None and not h.empty:
                 hourly[name] = h
