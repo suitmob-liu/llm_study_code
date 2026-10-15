@@ -10,6 +10,7 @@
 import io
 import json
 import re
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -34,10 +35,18 @@ SOURCE_NAME = {"gold": "新浪", "silver": "新浪", "oil": "新浪", "dxy": "�
                "spx": "CBOE", "cot": "CFTC"}
 
 
-def _get(url: str, params: dict | None = None, timeout: int = 20) -> str:
-    r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
-    r.raise_for_status()
-    return r.text
+def _get(url: str, params: dict | None = None, timeout: int = 20, retries: int = 3) -> str:
+    """带重试的 GET：新浪等源偶尔超时，重试通常就能成功。"""
+    last = None
+    for i in range(retries):
+        try:
+            r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
+            r.raise_for_status()
+            return r.text
+        except (requests.Timeout, requests.ConnectionError) as e:
+            last = e
+            time.sleep(2 * (i + 1))
+    raise last
 
 
 def _jsonp_list(text: str) -> list:
