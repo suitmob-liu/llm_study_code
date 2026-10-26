@@ -1,0 +1,4 @@
+﻿build/
+out/
+# 签名私钥不入库，请自行备份（丢失后新版本无法覆盖安装旧版本）
+release.keystore
