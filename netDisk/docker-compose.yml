@@ -1,0 +1,26 @@
+services:
+  netdisk:
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+    image: netdisk:latest
+    container_name: netdisk
+    ports:
+      - "${PORT:-8686}:8000"
+    environment:
+      NETDISK_PASSWORD: ${NETDISK_PASSWORD:-}
+      NETDISK_QUOTA_GB: ${NETDISK_QUOTA_GB:-2}
+      NETDISK_MAX_DEVICES: ${NETDISK_MAX_DEVICES:-10}
+      NETDISK_SESSION_DAYS: ${NETDISK_SESSION_DAYS:-30}
+      NETDISK_LOGIN_MAX_FAILS: ${NETDISK_LOGIN_MAX_FAILS:-5}
+      NETDISK_LOGIN_LOCK_MINUTES: ${NETDISK_LOGIN_LOCK_MINUTES:-10}
+      NETDISK_COOKIE_SECURE: ${NETDISK_COOKIE_SECURE:-0}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
+    volumes:
+      - netdisk_data:/data
+    restart: unless-stopped
+
+volumes:
+  netdisk_data:

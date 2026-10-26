@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>netDisk 登录</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+<form class="login-card" id="form" autocomplete="on">
+  <div class="logo">☁</div>
+  <h1>netDisk</h1>
+  <p class="muted">私人在线网盘，请输入访问密码</p>
+  <input type="password" id="password" name="password" placeholder="访问密码" autocomplete="current-password" required autofocus>
+  <input type="text" id="device" placeholder="设备名称（可选，如：我的手机）" maxlength="60">
+  <button type="submit" id="submit">登录</button>
+  <p class="error" id="error"></p>
+  <div class="limit" id="limit" hidden>
+    <p>在线设备已达上限，以下设备正在使用：</p>
+    <ul id="limit-list"></ul>
+    <button type="button" id="evict" class="danger">下线最久未使用的设备并登录</button>
+  </div>
+</form>
+<script>
+const $ = (id) => document.getElementById(id);
+const DEVICE_KEY = "netdisk.deviceName";
+try { $("device").value = localStorage.getItem(DEVICE_KEY) || ""; } catch (e) {}
+
+function fmtTime(t) {
+  const d = new Date(t * 1000);
+  return d.toLocaleString("zh-CN", { hour12: false });
+}
+
+async function login(evict) {
+  $("error").textContent = "";
+  $("submit").disabled = $("evict").disabled = true;
+  const deviceName = $("device").value.trim();
+  try { localStorage.setItem(DEVICE_KEY, deviceName); } catch (e) {}
+  try {
+    const r = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "netdisk" },
+      body: JSON.stringify({ password: $("password").value, device_name: deviceName, evict_oldest: !!evict }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) { location.href = "/"; return; }
+    if (r.status === 409 && data.code === "device_limit") {
+      const ul = $("limit-list");
+      ul.innerHTML = "";
+      for (const d of data.devices) {
+        const li = document.createElement("li");
+        li.textContent = `${d.name}（${d.ip || "未知 IP"}，最近活动 ${fmtTime(d.last_seen)}）`;
+        ul.appendChild(li);
+      }
+      $("limit").hidden = false;
+    }
+    $("error").textContent = data.detail || `登录失败（${r.status}）`;
+  } catch (e) {
+    $("error").textContent = "网络错误，请稍后重试";
+  } finally {
+    $("submit").disabled = $("evict").disabled = false;
+  }
+}
+
+$("form").addEventListener("submit", (e) => { e.preventDefault(); login(false); });
+$("evict").addEventListener("click", () => login(true));
+</script>
+</body>
+</html>

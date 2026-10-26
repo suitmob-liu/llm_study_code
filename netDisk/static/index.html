@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>netDisk</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">☁ netDisk</a>
+  <div class="search">
+    <input type="search" id="search" placeholder="搜索文件名">
+  </div>
+  <div class="top-actions">
+    <button id="btn-devices" class="ghost" title="在线设备">📱 <span id="dev-count">-</span></button>
+    <button id="btn-logout" class="ghost" title="退出登录">退出</button>
+  </div>
+</header>
+
+<div class="usage">
+  <div class="usage-bar"><div id="usage-fill"></div></div>
+  <span id="usage-text">-</span>
+</div>
+
+<main>
+  <div class="toolbar">
+    <nav class="crumbs" id="crumbs"></nav>
+    <div class="tools">
+      <button id="btn-upload">⬆ 上传文件</button>
+      <button id="btn-upload-dir" class="secondary">上传文件夹</button>
+      <button id="btn-mkdir" class="secondary">新建文件夹</button>
+    </div>
+  </div>
+
+  <div class="selbar" id="selbar" hidden>
+    <span id="sel-count"></span>
+    <button id="sel-download" class="secondary">下载</button>
+    <button id="sel-move" class="secondary">移动</button>
+    <button id="sel-rename" class="secondary">重命名</button>
+    <button id="sel-delete" class="danger">删除</button>
+    <button id="sel-clear" class="ghost">取消选择</button>
+  </div>
+
+  <div class="list" id="list">
+    <div class="list-head">
+      <label class="cb"><input type="checkbox" id="sel-all"></label>
+      <span class="col-name">名称</span>
+      <span class="col-size">大小</span>
+      <span class="col-time">修改时间</span>
+    </div>
+    <div id="rows"></div>
+    <div class="empty" id="empty" hidden>这里还没有文件，拖拽文件到页面或点「上传文件」</div>
+  </div>
+</main>
+
+<input type="file" id="file-input" multiple hidden>
+<input type="file" id="dir-input" webkitdirectory multiple hidden>
+
+<div class="drop-mask" id="drop-mask"><div>松开鼠标上传到当前文件夹</div></div>
+
+<!-- 上传队列 -->
+<section class="uploads" id="uploads" hidden>
+  <header><span id="up-title">上传</span><button class="ghost" id="up-close">✕</button></header>
+  <div id="up-list"></div>
+</section>
+
+<!-- 通用弹窗 -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <header><h3 id="modal-title"></h3><button class="ghost" id="modal-close">✕</button></header>
+    <div id="modal-body"></div>
+    <footer id="modal-foot"></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
