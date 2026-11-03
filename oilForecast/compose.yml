@@ -1,0 +1,10 @@
+services:
+  oil-forecast:
+    build: .
+    ports:
+      - "127.0.0.1:${PORT:-8787}:8787"
+    volumes:
+      - oil-data:/data
+    restart: unless-stopped
+volumes:
+  oil-data:
